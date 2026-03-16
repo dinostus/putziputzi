@@ -252,6 +252,21 @@ h1 {
   font-weight: 700;
 }
 
+.edit-task {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #d9e4d4;
+  color: #385740;
+  font-weight: 700;
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .day-list {
   padding: 0 16px 16px;
   display: grid;
@@ -368,6 +383,12 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .primary-button {

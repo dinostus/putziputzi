@@ -21,6 +21,7 @@ const supabaseClient = hasSupabaseConfig
 let activeFilter = "all";
 let customTasks = [];
 let syncTimer = null;
+let editingTaskId = null;
 
 function loadLocalCustomTasks() {
   try {
@@ -330,15 +331,27 @@ function renderCustomTaskList() {
             <strong>${task.name}</strong>
             <p>${describeRecurrence(task)}</p>
           </div>
-          <button class="delete-task" type="button" data-task-id="${task.id}">Entfernen</button>
+          <div class="task-actions">
+            <button class="edit-task" type="button" data-task-id="${task.id}">Bearbeiten</button>
+            <button class="delete-task" type="button" data-task-id="${task.id}">Entfernen</button>
+          </div>
         </article>
       `
     )
     .join("");
 
+  document.querySelectorAll(".edit-task").forEach((button) => {
+    button.addEventListener("click", () => {
+      startEditingTask(button.dataset.taskId);
+    });
+  });
+
   document.querySelectorAll(".delete-task").forEach((button) => {
     button.addEventListener("click", async () => {
       await deleteCustomTask(button.dataset.taskId);
+      if (editingTaskId === button.dataset.taskId) {
+        resetTaskForm();
+      }
       await renderApp();
     });
   });
@@ -452,6 +465,10 @@ function bindAccordions() {
 }
 
 async function upsertCustomTask(task) {
+  if (task.id && customTasks.some((item) => item.id === task.id)) {
+    return updateCustomTask(task);
+  }
+
   if (!supabaseClient) {
     customTasks.push(task);
     saveCustomTasks();
@@ -468,6 +485,33 @@ async function upsertCustomTask(task) {
 
   if (error) {
     customTasks.push(task);
+    saveCustomTasks();
+    return;
+  }
+
+  await loadCustomTasks();
+}
+
+async function updateCustomTask(task) {
+  if (!supabaseClient) {
+    customTasks = customTasks.map((item) => (item.id === task.id ? task : item));
+    saveCustomTasks();
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("household_tasks")
+    .update({
+      name: task.name,
+      start_date: task.startDate,
+      unit: task.unit,
+      interval: task.interval,
+    })
+    .eq("id", task.id)
+    .eq("household_id", supabaseConfig.householdId);
+
+  if (error) {
+    customTasks = customTasks.map((item) => (item.id === task.id ? task : item));
     saveCustomTasks();
     return;
   }
@@ -497,12 +541,43 @@ async function deleteCustomTask(taskId) {
   await loadCustomTasks();
 }
 
+function startEditingTask(taskId) {
+  const task = customTasks.find((item) => item.id === taskId);
+  if (!task) {
+    return;
+  }
+
+  editingTaskId = task.id;
+  document.getElementById("task-id").value = task.id;
+  document.getElementById("task-name").value = task.name;
+  document.getElementById("task-start-date").value = task.startDate;
+  document.querySelector('#task-form select[name="unit"]').value = task.unit;
+  document.querySelector('#task-form input[name="interval"]').value = task.interval;
+  document.getElementById("task-submit-button").textContent = "Aufgabe aktualisieren";
+  document.getElementById("task-cancel-edit").classList.remove("hidden");
+  document.getElementById("custom-task-list").classList.remove("hidden");
+  document.querySelector('[data-accordion="custom-task-list"]').setAttribute("aria-expanded", "true");
+  document.getElementById("task-name").focus();
+}
+
+function resetTaskForm() {
+  editingTaskId = null;
+  document.getElementById("task-form").reset();
+  document.getElementById("task-id").value = "";
+  document.getElementById("task-start-date").value = startDate.toISOString().slice(0, 10);
+  document.querySelector('#task-form select[name="unit"]').value = "weeks";
+  document.querySelector('#task-form input[name="interval"]').value = 1;
+  document.getElementById("task-submit-button").textContent = "Aufgabe speichern";
+  document.getElementById("task-cancel-edit").classList.add("hidden");
+}
+
 function bindTaskForm() {
   const openButton = document.getElementById("open-task-form");
   const customTaskSection = document.getElementById("custom-task-list");
   const customTaskToggle = document.querySelector('[data-accordion="custom-task-list"]');
   const form = document.getElementById("task-form");
   const dateInput = document.getElementById("task-start-date");
+  const cancelButton = document.getElementById("task-cancel-edit");
 
   dateInput.value = startDate.toISOString().slice(0, 10);
 
@@ -517,7 +592,7 @@ function bindTaskForm() {
 
     const formData = new FormData(form);
     const task = {
-      id: `${Date.now()}`,
+      id: String(formData.get("id") || `${Date.now()}`),
       name: String(formData.get("name")).trim(),
       startDate: String(formData.get("startDate")),
       unit: String(formData.get("unit")),
@@ -529,9 +604,12 @@ function bindTaskForm() {
     }
 
     await upsertCustomTask(task);
-    form.reset();
-    dateInput.value = startDate.toISOString().slice(0, 10);
+    resetTaskForm();
     await renderApp();
+  });
+
+  cancelButton.addEventListener("click", () => {
+    resetTaskForm();
   });
 }
 
