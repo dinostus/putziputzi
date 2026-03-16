@@ -2,6 +2,7 @@ const startDate = new Date("2026-03-16T00:00:00");
 const totalWeeks = 12;
 const people = ["Laura", "Dino"];
 const storageKey = "putzplan-custom-tasks";
+const baseStorageKey = "putzplan-base-tasks";
 const syncIntervalMs = 15000;
 const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
@@ -17,9 +18,22 @@ const hasSupabaseConfig =
 const supabaseClient = hasSupabaseConfig
   ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey)
   : null;
+const defaultBaseTasks = [
+  { id: "base-1", name: "aufräumen", startDate: "2026-03-16", unit: "days", interval: 1, weekday: null, firstPerson: "Laura" },
+  { id: "base-2", name: "staubsaugen", startDate: "2026-03-16", unit: "weeks", interval: 1, weekday: 1, firstPerson: "Laura" },
+  { id: "base-3", name: "Küche putzen", startDate: "2026-03-17", unit: "weeks", interval: 1, weekday: 2, firstPerson: "Dino" },
+  { id: "base-4", name: "WC putzen", startDate: "2026-03-18", unit: "weeks", interval: 1, weekday: 3, firstPerson: "Laura" },
+  { id: "base-5", name: "Bad putzen", startDate: "2026-03-20", unit: "weeks", interval: 1, weekday: 5, firstPerson: "Dino" },
+  { id: "base-6", name: "Bettzeug wechseln", startDate: "2026-03-16", unit: "weeks", interval: 2, weekday: 1, firstPerson: "Laura" },
+  { id: "base-7", name: "staubsaugen + Boden nass", startDate: "2026-03-21", unit: "weeks", interval: 4, weekday: 6, firstPerson: "Dino" },
+  { id: "base-8", name: "Müll rausbringen", startDate: "2026-03-16", unit: "weeks", interval: 1, weekday: 1, firstPerson: "Dino" },
+  { id: "base-9", name: "Müll rausbringen", startDate: "2026-03-18", unit: "weeks", interval: 1, weekday: 3, firstPerson: "Dino" },
+  { id: "base-10", name: "Müll rausbringen", startDate: "2026-03-20", unit: "weeks", interval: 1, weekday: 5, firstPerson: "Laura" },
+];
 
 let activeFilter = "all";
 let customTasks = [];
+let baseTasks = loadBaseTasks();
 let syncTimer = null;
 let editingTaskId = null;
 
@@ -34,6 +48,19 @@ function loadLocalCustomTasks() {
 
 function saveCustomTasks() {
   localStorage.setItem(storageKey, JSON.stringify(customTasks));
+}
+
+function loadBaseTasks() {
+  try {
+    const raw = localStorage.getItem(baseStorageKey);
+    return raw ? JSON.parse(raw) : [...defaultBaseTasks];
+  } catch {
+    return [...defaultBaseTasks];
+  }
+}
+
+function saveBaseTasks() {
+  localStorage.setItem(baseStorageKey, JSON.stringify(baseTasks));
 }
 
 async function loadCustomTasks() {
@@ -77,8 +104,6 @@ function titleCase(input) {
 
 function buildBaseSchedule() {
   const days = [];
-  let beddingOccurrence = 0;
-  let mopOccurrence = 0;
 
   for (let offset = 0; offset < totalWeeks * 7; offset += 1) {
     const date = new Date(startDate);
@@ -94,72 +119,32 @@ function buildBaseSchedule() {
       note: "",
     };
 
-    if (offset % 2 === 0) {
-      entry.Laura.push("aufräumen");
-    } else {
-      entry.Dino.push("aufräumen");
-    }
-
-    if (dayOfWeek === 1) {
-      if (weekIndex % 2 === 0) {
-        entry.Laura.push("staubsaugen");
-        entry.Dino.push("Müll rausbringen");
-      } else {
-        entry.Dino.push("staubsaugen");
-        entry.Laura.push("Müll rausbringen");
-      }
-
-      if (weekIndex % 2 === 0) {
-        if (beddingOccurrence % 2 === 0) {
-          entry.Laura.push("Bettzeug wechseln");
-        } else {
-          entry.Dino.push("Bettzeug wechseln");
-        }
-        beddingOccurrence += 1;
-      }
-    }
-
-    if (dayOfWeek === 2) {
-      if (weekIndex % 2 === 0) {
-        entry.Dino.push("Küche putzen");
-      } else {
-        entry.Laura.push("Küche putzen");
-      }
-    }
-
-    if (dayOfWeek === 3) {
-      if (weekIndex % 2 === 0) {
-        entry.Laura.push("WC putzen");
-        entry.Dino.push("Müll rausbringen");
-      } else {
-        entry.Dino.push("WC putzen");
-        entry.Laura.push("Müll rausbringen");
-      }
-    }
-
-    if (dayOfWeek === 5) {
-      if (weekIndex % 2 === 0) {
-        entry.Dino.push("Bad putzen");
-        entry.Laura.push("Müll rausbringen");
-      } else {
-        entry.Laura.push("Bad putzen");
-        entry.Dino.push("Müll rausbringen");
-      }
-    }
-
-    if (dayOfWeek === 6 && weekIndex % 4 === 0) {
-      if (mopOccurrence % 2 === 0) {
-        entry.Dino.push("staubsaugen + Boden nass");
-      } else {
-        entry.Laura.push("staubsaugen + Boden nass");
-      }
-      mopOccurrence += 1;
-    }
-
     days.push(entry);
   }
 
+  const occurrences = {};
+  baseTasks.forEach((task) => {
+    occurrences[task.id] = 0;
+  });
+
+  days.forEach((day) => {
+    baseTasks.forEach((task) => {
+      if (!matchesRecurrence(task, day)) {
+        return;
+      }
+
+      const occurrence = occurrences[task.id] || 0;
+      const assignedPerson = occurrence % 2 === 0 ? task.firstPerson : oppositePerson(task.firstPerson);
+      day[assignedPerson].push(task.name);
+      occurrences[task.id] = occurrence + 1;
+    });
+  });
+
   return days;
+}
+
+function oppositePerson(person) {
+  return person === "Laura" ? "Dino" : "Laura";
 }
 
 function matchesRecurrence(task, day) {
@@ -357,6 +342,62 @@ function renderCustomTaskList() {
   });
 }
 
+function renderBaseTaskList() {
+  const list = document.getElementById("base-task-items");
+
+  list.innerHTML = baseTasks
+    .map(
+      (task) => `
+        <article class="custom-task-item">
+          <div>
+            <strong>${task.name}</strong>
+            <p>${describeRecurrence(task)} | Start: ${task.firstPerson}</p>
+          </div>
+          <div class="task-actions">
+            <button class="edit-base-task" type="button" data-task-id="${task.id}">Umbenennen</button>
+            <button class="delete-base-task" type="button" data-task-id="${task.id}">Löschen</button>
+            <button class="reset-task" type="button" data-task-id="${task.id}">Standardname</button>
+          </div>
+        </article>
+      `
+    )
+    .join("");
+
+  document.querySelectorAll(".edit-base-task").forEach((button) => {
+    button.addEventListener("click", () => {
+      const task = baseTasks.find((item) => item.id === button.dataset.taskId);
+      if (!task) return;
+      const newName = window.prompt("Neuer Name für diese Grundplan-Aufgabe:", task.name);
+      if (!newName || !newName.trim()) return;
+      baseTasks = baseTasks.map((item) =>
+        item.id === task.id ? { ...item, name: newName.trim() } : item
+      );
+      saveBaseTasks();
+      renderApp();
+    });
+  });
+
+  document.querySelectorAll(".delete-base-task").forEach((button) => {
+    button.addEventListener("click", () => {
+      baseTasks = baseTasks.filter((item) => item.id !== button.dataset.taskId);
+      saveBaseTasks();
+      renderApp();
+    });
+  });
+
+  document.querySelectorAll(".reset-task").forEach((button) => {
+    button.addEventListener("click", () => {
+      const original = defaultBaseTasks.find((item) => item.id === button.dataset.taskId);
+      if (!original) return;
+      baseTasks = baseTasks.map((item) =>
+        item.id === original.id ? { ...item, name: original.name } : item
+      );
+      saveBaseTasks();
+      renderApp();
+    });
+  });
+}
+
 function describeRecurrence(task) {
   const units = {
     days: task.interval === 1 ? "jeden Tag" : `alle ${task.interval} Tage`,
@@ -376,6 +417,7 @@ function renderList(schedule) {
 
   stats.innerHTML = buildStats(visibleDays);
   renderTaskOverview(taskSummary);
+  renderBaseTaskList();
   renderCustomTaskList();
 
   list.innerHTML = visibleDays

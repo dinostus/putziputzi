@@ -261,6 +261,15 @@ h1 {
   font-weight: 700;
 }
 
+.reset-task {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #e3e0f2;
+  color: #514a7e;
+  font-weight: 700;
+}
+
 .task-actions {
   display: flex;
   gap: 8px;
