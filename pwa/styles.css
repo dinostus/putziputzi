@@ -86,19 +86,14 @@ h1 {
   font-weight: 600;
 }
 
-.controls {
-  margin-top: 16px;
-  padding: 14px;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
 .chips {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.today-chips {
+  margin-top: 4px;
 }
 
 .chip {
@@ -115,21 +110,11 @@ h1 {
   color: white;
 }
 
-.fab-inline,
 .primary-button,
 .ghost-button {
   border: 0;
   border-radius: 999px;
   font-weight: 700;
-}
-
-.fab-inline {
-  min-width: 48px;
-  height: 48px;
-  font-size: 1.6rem;
-  background: var(--accent);
-  color: white;
-  box-shadow: var(--shadow);
 }
 
 .stats {
@@ -417,7 +402,6 @@ h1 {
     padding: 18px 12px 32px;
   }
 
-  .controls,
   .custom-task-item {
     align-items: stretch;
     flex-direction: column;

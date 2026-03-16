@@ -360,10 +360,10 @@ function renderToday(schedule) {
   document.getElementById("today-date").textContent = today.title;
 
   const summaries = [];
-  if (today.Laura.length) {
+  if ((activeFilter === "all" || activeFilter === "Laura") && today.Laura.length) {
     summaries.push(`Laura: ${today.Laura.join(", ")}`);
   }
-  if (today.Dino.length) {
+  if ((activeFilter === "all" || activeFilter === "Dino") && today.Dino.length) {
     summaries.push(`Dino: ${today.Dino.join(", ")}`);
   }
 
@@ -540,7 +540,6 @@ function resetTaskForm() {
 }
 
 function bindTaskForm() {
-  const openButton = document.getElementById("open-task-form");
   const taskSection = document.getElementById("custom-task-list");
   const taskToggle = document.querySelector('[data-accordion="custom-task-list"]');
   const form = document.getElementById("task-form");
@@ -548,12 +547,6 @@ function bindTaskForm() {
   const cancelButton = document.getElementById("task-cancel-edit");
 
   dateInput.value = toIsoDate(startDate);
-
-  openButton.addEventListener("click", () => {
-    taskSection.classList.remove("hidden");
-    taskToggle.setAttribute("aria-expanded", "true");
-    document.getElementById("task-name").focus();
-  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -589,6 +582,9 @@ function bindTaskForm() {
   cancelButton.addEventListener("click", () => {
     resetTaskForm();
   });
+
+  taskSection.classList.remove("hidden");
+  taskToggle.setAttribute("aria-expanded", "true");
 }
 
 async function startPolling() {
