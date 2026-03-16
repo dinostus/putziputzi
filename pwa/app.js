@@ -2,6 +2,7 @@ const startDate = new Date("2026-03-16T00:00:00");
 const totalWeeks = 12;
 const people = ["Laura", "Dino"];
 const storageKey = "putzplan-all-tasks";
+const completionStorageKey = "putzplan-completions";
 const syncIntervalMs = 15000;
 const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
@@ -33,6 +34,7 @@ const defaultTasks = [
 
 let activeFilter = "all";
 let tasks = [];
+let completions = {};
 let syncTimer = null;
 let editingTaskId = null;
 
@@ -47,6 +49,19 @@ function loadLocalTasks() {
 
 function saveLocalTasks() {
   localStorage.setItem(storageKey, JSON.stringify(tasks));
+}
+
+function loadLocalCompletions() {
+  try {
+    const raw = localStorage.getItem(completionStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalCompletions() {
+  localStorage.setItem(completionStorageKey, JSON.stringify(completions));
 }
 
 function cloneTask(task) {
@@ -114,6 +129,29 @@ async function loadTasks() {
     builtIn: Boolean(item.built_in),
   }));
   saveLocalTasks();
+}
+
+async function loadCompletions() {
+  if (!supabaseClient) {
+    completions = loadLocalCompletions();
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("household_task_completions")
+    .select("completion_key, done")
+    .eq("household_id", supabaseConfig.householdId);
+
+  if (error) {
+    completions = loadLocalCompletions();
+    return;
+  }
+
+  completions = {};
+  data.forEach((item) => {
+    completions[item.completion_key] = Boolean(item.done);
+  });
+  saveLocalCompletions();
 }
 
 async function seedDefaultTasks() {
@@ -208,10 +246,15 @@ function buildSchedule() {
 
         const occurrence = counts[task.id] || 0;
         const person = occurrence % 2 === 0 ? task.firstPerson : oppositePerson(task.firstPerson);
-        day[person].push(task.name);
-        counts[task.id] = occurrence + 1;
-      });
+      const item = {
+        taskId: task.id,
+        name: task.name,
+        key: `${day.iso}|${person}|${task.id}|${occurrence}`,
+      };
+      day[person].push(item);
+      counts[task.id] = occurrence + 1;
     });
+  });
 
   return days;
 }
@@ -225,18 +268,18 @@ function getVisibleDays(schedule) {
 }
 
 function buildStats(visibleDays) {
-  const counts = { Laura: 0, Dino: 0 };
+  const counts = { Laura: 0, Dino: 0, completed: 0 };
 
   visibleDays.forEach((day) => {
     counts.Laura += day.Laura.length;
     counts.Dino += day.Dino.length;
+    counts.completed += [...day.Laura, ...day.Dino].filter((item) => completions[item.key]).length;
   });
 
   return [
-    { label: "Sync", value: supabaseClient ? "Supabase" : "Nur dieses Gerät" },
-    { label: "Tage sichtbar", value: visibleDays.length },
     { label: "Laura Aufgaben", value: counts.Laura },
     { label: "Dino Aufgaben", value: counts.Dino },
+    { label: "Erledigt", value: counts.completed },
   ]
     .map(
       (stat) => `
@@ -317,12 +360,15 @@ function renderList(schedule) {
   list.innerHTML = visibleDays
     .map((day) => {
       const lauraTasks = day.Laura.length
-        ? `<ul class="task-list">${day.Laura.map((task) => `<li>${task}</li>`).join("")}</ul>`
+        ? `<ul class="task-list">${day.Laura.map((task) => `<li>${completions[task.key] ? `<s>${task.name}</s>` : task.name}</li>`).join("")}</ul>`
         : '<p class="empty">Heute nichts extra.</p>';
 
       const dinoTasks = day.Dino.length
-        ? `<ul class="task-list">${day.Dino.map((task) => `<li>${task}</li>`).join("")}</ul>`
+        ? `<ul class="task-list">${day.Dino.map((task) => `<li>${completions[task.key] ? `<s>${task.name}</s>` : task.name}</li>`).join("")}</ul>`
         : '<p class="empty">Heute nichts extra.</p>';
+
+      const totalDone = [...day.Laura, ...day.Dino].filter((item) => completions[item.key]).length;
+      const totalTasks = day.Laura.length + day.Dino.length;
 
       return `
         <article class="day-card ${day.iso === today.iso ? "today" : ""}">
@@ -330,7 +376,7 @@ function renderList(schedule) {
             <div>
               <p class="date-title">${day.title}</p>
             </div>
-            ${day.iso === today.iso ? '<span class="date-badge">Heute</span>' : ""}
+            <span class="date-badge">${day.iso === today.iso ? "Heute | " : ""}${totalDone}/${totalTasks} erledigt</span>
           </div>
           <div class="columns">
             ${
@@ -361,20 +407,62 @@ function renderToday(schedule) {
 
   const summaries = [];
   if ((activeFilter === "all" || activeFilter === "Laura") && today.Laura.length) {
-    summaries.push(`Laura: ${today.Laura.join(", ")}`);
+    summaries.push(`Laura: ${today.Laura.map((item) => item.name).join(", ")}`);
   }
   if ((activeFilter === "all" || activeFilter === "Dino") && today.Dino.length) {
-    summaries.push(`Dino: ${today.Dino.join(", ")}`);
+    summaries.push(`Dino: ${today.Dino.map((item) => item.name).join(", ")}`);
   }
 
   document.getElementById("today-summary").textContent =
     summaries.join(" | ") || "Heute sind keine Extra-Aufgaben eingeplant.";
+
+  renderTodayChecklist(today);
 }
 
 async function renderApp() {
   const schedule = buildSchedule();
   renderToday(schedule);
   renderList(schedule);
+}
+
+function getTodayVisibleItems(today) {
+  const items = [];
+  if (activeFilter === "all" || activeFilter === "Laura") {
+    today.Laura.forEach((item) => items.push({ ...item, person: "Laura" }));
+  }
+  if (activeFilter === "all" || activeFilter === "Dino") {
+    today.Dino.forEach((item) => items.push({ ...item, person: "Dino" }));
+  }
+  return items;
+}
+
+function renderTodayChecklist(today) {
+  const container = document.getElementById("today-checklist");
+  const visibleItems = getTodayVisibleItems(today);
+
+  if (!visibleItems.length) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = visibleItems
+    .map((item) => {
+      const done = Boolean(completions[item.key]);
+      return `
+        <label class="today-check-item ${done ? "done" : ""}">
+          <input type="checkbox" data-completion-key="${item.key}" ${done ? "checked" : ""} />
+          <span class="${done ? "done-text" : ""}">${item.person}: ${item.name}</span>
+        </label>
+      `;
+    })
+    .join("");
+
+  container.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+    checkbox.addEventListener("change", async () => {
+      await setCompletion(checkbox.dataset.completionKey, checkbox.checked);
+      await renderApp();
+    });
+  });
 }
 
 function bindFilters() {
@@ -509,6 +597,31 @@ async function deleteTask(taskId) {
   await loadTasks();
 }
 
+async function setCompletion(completionKey, done) {
+  completions[completionKey] = done;
+
+  if (!supabaseClient) {
+    saveLocalCompletions();
+    return;
+  }
+
+  const { error } = await supabaseClient.from("household_task_completions").upsert(
+    {
+      household_id: supabaseConfig.householdId,
+      completion_key: completionKey,
+      done,
+    },
+    { onConflict: "household_id,completion_key" }
+  );
+
+  if (error) {
+    saveLocalCompletions();
+    return;
+  }
+
+  saveLocalCompletions();
+}
+
 function startEditingTask(taskId) {
   const task = tasks.find((item) => item.id === taskId);
   if (!task) {
@@ -598,12 +711,14 @@ async function startPolling() {
 
   syncTimer = setInterval(async () => {
     await loadTasks();
+    await loadCompletions();
     await renderApp();
   }, syncIntervalMs);
 }
 
 async function initApp() {
   await loadTasks();
+  await loadCompletions();
   bindFilters();
   bindAccordions();
   bindTaskForm();

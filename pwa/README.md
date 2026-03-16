@@ -52,6 +52,8 @@ Wichtig fuer die neue zusammengefuehrte Task-Verwaltung:
 
 Fuehre zusaetzlich auch noch [supabase-tasks-migration.sql](/C:/Users/Dell/Documents/Putzplan/pwa/supabase-tasks-migration.sql) im SQL Editor aus.
 
+Fuer die Erledigt-Haekchen bei `Heute` fuehre auch noch [supabase-completions-migration.sql](/C:/Users/Dell/Documents/Putzplan/pwa/supabase-completions-migration.sql) aus.
+
 ## Online auf Netlify veroeffentlichen
 
 So ist die App auch ausserhalb deiner Wohnung erreichbar:
