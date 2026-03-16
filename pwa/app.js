@@ -583,8 +583,8 @@ function bindTaskForm() {
     resetTaskForm();
   });
 
-  taskSection.classList.remove("hidden");
-  taskToggle.setAttribute("aria-expanded", "true");
+  taskSection.classList.add("hidden");
+  taskToggle.setAttribute("aria-expanded", "false");
 }
 
 async function startPolling() {
