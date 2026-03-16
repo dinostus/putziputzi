@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6f8f72" />
+    <title>Putzplan</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Laura und Dino</p>
+        <h1>Putzplan</h1>
+        <p class="subtle">
+          Tagesansicht mit fair verteilter Aufgabenliste fuer 12 Wochen.
+        </p>
+      </section>
+
+      <section class="today-card" id="today-card">
+        <div>
+          <p class="label">Heute</p>
+          <h2 id="today-date">-</h2>
+        </div>
+        <p class="today-summary" id="today-summary">Plan wird geladen...</p>
+      </section>
+
+      <section class="controls">
+        <div class="chips" role="tablist" aria-label="Filter">
+          <button class="chip active" data-filter="all" type="button">Alle</button>
+          <button class="chip" data-filter="Laura" type="button">Laura</button>
+          <button class="chip" data-filter="Dino" type="button">Dino</button>
+        </div>
+        <button class="fab-inline" id="open-task-form" type="button" aria-label="Neue Aufgabe hinzufuegen">
+          +
+        </button>
+      </section>
+
+      <section class="stats" id="stats"></section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="custom-task-list" aria-expanded="false">
+          <p class="label">Eigene Tasks</p>
+          <h3>Neue Aufgaben hinzufuegen</h3>
+        </button>
+        <section class="custom-task-list accordion-content hidden" id="custom-task-list">
+          <form class="task-form inline-task-form" id="task-form">
+            <label>
+              <span>Name</span>
+              <input id="task-name" name="name" type="text" placeholder="z. B. Fenster putzen" required />
+            </label>
+
+            <label>
+              <span>Startdatum</span>
+              <input id="task-start-date" name="startDate" type="date" required />
+            </label>
+
+            <div class="form-row">
+              <label>
+                <span>Wiederholung</span>
+                <select name="unit">
+                  <option value="days">Tage</option>
+                  <option value="weeks" selected>Wochen</option>
+                  <option value="months">Monate</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Intervall</span>
+                <input name="interval" type="number" min="1" value="1" required />
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit">Aufgabe speichern</button>
+          </form>
+
+          <div class="custom-task-items" id="custom-task-items"></div>
+        </section>
+      </section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="task-overview" aria-expanded="true">
+          <p class="label">Alle Tasks</p>
+          <h3>Komplette Aufgabenliste</h3>
+        </button>
+        <section class="task-overview accordion-content" id="task-overview"></section>
+      </section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="day-list" aria-expanded="true">
+          <p class="label">Tagesplan</p>
+          <h3>Alle Aufgaben im Blick</h3>
+        </button>
+        <section class="day-list accordion-content" id="day-list"></section>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
