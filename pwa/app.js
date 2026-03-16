@@ -441,7 +441,7 @@ function renderTodayChecklist(today) {
   const visibleItems = getTodayVisibleItems(today);
 
   if (!visibleItems.length) {
-    container.innerHTML = "";
+    container.innerHTML = '<p class="empty">Heute gibt es nichts zum Abhaken.</p>';
     return;
   }
 
@@ -459,6 +459,14 @@ function renderTodayChecklist(today) {
 
   container.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
     checkbox.addEventListener("change", async () => {
+      if (checkbox.checked) {
+        const confirmed = window.confirm("Ist diese Aufgabe wirklich erledigt?");
+        if (!confirmed) {
+          checkbox.checked = false;
+          return;
+        }
+      }
+
       await setCompletion(checkbox.dataset.completionKey, checkbox.checked);
       await renderApp();
     });
@@ -485,6 +493,21 @@ function bindAccordions() {
       button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
       target.classList.toggle("hidden", isExpanded);
     });
+  });
+}
+
+function bindTodayChecklistToggle() {
+  const button = document.getElementById("today-checklist-toggle");
+  const checklist = document.getElementById("today-checklist");
+
+  if (!button || !checklist) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    const isExpanded = button.getAttribute("aria-expanded") === "true";
+    button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+    checklist.classList.toggle("hidden", isExpanded);
   });
 }
 
@@ -721,6 +744,7 @@ async function initApp() {
   await loadCompletions();
   bindFilters();
   bindAccordions();
+  bindTodayChecklistToggle();
   bindTaskForm();
   await renderApp();
   await startPolling();

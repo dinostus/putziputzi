@@ -25,6 +25,10 @@ body {
   color: var(--text);
 }
 
+.hidden {
+  display: none !important;
+}
+
 .app-shell {
   width: min(920px, 100%);
   margin: 0 auto;
@@ -86,9 +90,40 @@ h1 {
   font-weight: 600;
 }
 
+.today-tasks-wrap {
+  display: grid;
+  gap: 10px;
+}
+
 .today-checklist {
   display: grid;
   gap: 8px;
+}
+
+.today-dropdown-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #efe6d8;
+  color: var(--text);
+  font-weight: 700;
+  position: relative;
+}
+
+.today-dropdown-button::after {
+  content: "+";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent-strong);
+  font-size: 1.2rem;
+}
+
+.today-dropdown-button[aria-expanded="true"]::after {
+  content: "-";
 }
 
 .today-check-item {
@@ -147,10 +182,10 @@ h1 {
 
 .stats {
   margin-top: 16px;
-  padding: 16px;
+  padding: 10px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .dropdown-section {
@@ -197,10 +232,17 @@ h1 {
 }
 
 .stat-box {
-  padding: 14px;
-  border-radius: 18px;
+  padding: 8px 10px;
+  border-radius: 14px;
   background: #f2eadf;
   border: 1px solid var(--line);
+  text-align: center;
+}
+
+.stat-box span {
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .task-box {
@@ -225,8 +267,8 @@ h1 {
 
 .stat-box strong {
   display: block;
-  font-size: 1.4rem;
-  margin-top: 6px;
+  font-size: 0.92rem;
+  margin-top: 4px;
 }
 
 .custom-task-list {
@@ -428,6 +470,22 @@ h1 {
 @media (max-width: 640px) {
   .app-shell {
     padding: 18px 12px 32px;
+  }
+
+  .stats {
+    gap: 6px;
+  }
+
+  .stat-box {
+    padding: 8px 6px;
+  }
+
+  .stat-box span {
+    font-size: 0.66rem;
+  }
+
+  .stat-box strong {
+    font-size: 0.84rem;
   }
 
   .custom-task-item {
