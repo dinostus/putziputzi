@@ -63,7 +63,10 @@ function cloneTask(task) {
 }
 
 function toIsoDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function fromIsoDate(value) {
@@ -529,7 +532,7 @@ function resetTaskForm() {
   editingTaskId = null;
   document.getElementById("task-form").reset();
   document.getElementById("task-id").value = "";
-  document.getElementById("task-start-date").value = startDate.toISOString().slice(0, 10);
+  document.getElementById("task-start-date").value = toIsoDate(startDate);
   document.querySelector('#task-form select[name="unit"]').value = "weeks";
   document.querySelector('#task-form input[name="interval"]').value = 1;
   document.getElementById("task-submit-button").textContent = "Aufgabe speichern";
@@ -544,7 +547,7 @@ function bindTaskForm() {
   const dateInput = document.getElementById("task-start-date");
   const cancelButton = document.getElementById("task-cancel-edit");
 
-  dateInput.value = startDate.toISOString().slice(0, 10);
+  dateInput.value = toIsoDate(startDate);
 
   openButton.addEventListener("click", () => {
     taskSection.classList.remove("hidden");
