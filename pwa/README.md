@@ -48,6 +48,10 @@ window.SUPABASE_CONFIG = {
 
 Dann werden neue Tasks online gespeichert und zwischen beiden Geraeten synchronisiert.
 
+Wichtig fuer die neue zusammengefuehrte Task-Verwaltung:
+
+Fuehre zusaetzlich auch noch [supabase-tasks-migration.sql](/C:/Users/Dell/Documents/Putzplan/pwa/supabase-tasks-migration.sql) im SQL Editor aus.
+
 ## Online auf Netlify veroeffentlichen
 
 So ist die App auch ausserhalb deiner Wohnung erreichbar:

@@ -1,8 +1,7 @@
 const startDate = new Date("2026-03-16T00:00:00");
 const totalWeeks = 12;
 const people = ["Laura", "Dino"];
-const storageKey = "putzplan-custom-tasks";
-const baseStorageKey = "putzplan-base-tasks";
+const storageKey = "putzplan-all-tasks";
 const syncIntervalMs = 15000;
 const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
@@ -18,76 +17,49 @@ const hasSupabaseConfig =
 const supabaseClient = hasSupabaseConfig
   ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey)
   : null;
-const defaultBaseTasks = [
-  { id: "base-1", name: "aufräumen", startDate: "2026-03-16", unit: "days", interval: 1, weekday: null, firstPerson: "Laura" },
-  { id: "base-2", name: "staubsaugen", startDate: "2026-03-16", unit: "weeks", interval: 1, weekday: 1, firstPerson: "Laura" },
-  { id: "base-3", name: "Küche putzen", startDate: "2026-03-17", unit: "weeks", interval: 1, weekday: 2, firstPerson: "Dino" },
-  { id: "base-4", name: "WC putzen", startDate: "2026-03-18", unit: "weeks", interval: 1, weekday: 3, firstPerson: "Laura" },
-  { id: "base-5", name: "Bad putzen", startDate: "2026-03-20", unit: "weeks", interval: 1, weekday: 5, firstPerson: "Dino" },
-  { id: "base-6", name: "Bettzeug wechseln", startDate: "2026-03-16", unit: "weeks", interval: 2, weekday: 1, firstPerson: "Laura" },
-  { id: "base-7", name: "staubsaugen + Boden nass", startDate: "2026-03-21", unit: "weeks", interval: 4, weekday: 6, firstPerson: "Dino" },
-  { id: "base-8", name: "Müll rausbringen", startDate: "2026-03-16", unit: "weeks", interval: 1, weekday: 1, firstPerson: "Dino" },
-  { id: "base-9", name: "Müll rausbringen", startDate: "2026-03-18", unit: "weeks", interval: 1, weekday: 3, firstPerson: "Dino" },
-  { id: "base-10", name: "Müll rausbringen", startDate: "2026-03-20", unit: "weeks", interval: 1, weekday: 5, firstPerson: "Laura" },
+
+const defaultTasks = [
+  { seedKey: "seed-1", name: "aufräumen", startDate: "2026-03-16", unit: "days", interval: 1, firstPerson: "Laura", builtIn: true },
+  { seedKey: "seed-2", name: "staubsaugen", startDate: "2026-03-16", unit: "weeks", interval: 1, firstPerson: "Laura", builtIn: true },
+  { seedKey: "seed-3", name: "Küche putzen", startDate: "2026-03-17", unit: "weeks", interval: 1, firstPerson: "Dino", builtIn: true },
+  { seedKey: "seed-4", name: "WC putzen", startDate: "2026-03-18", unit: "weeks", interval: 1, firstPerson: "Laura", builtIn: true },
+  { seedKey: "seed-5", name: "Bad putzen", startDate: "2026-03-20", unit: "weeks", interval: 1, firstPerson: "Dino", builtIn: true },
+  { seedKey: "seed-6", name: "Bettzeug wechseln", startDate: "2026-03-16", unit: "weeks", interval: 2, firstPerson: "Laura", builtIn: true },
+  { seedKey: "seed-7", name: "staubsaugen + Boden nass", startDate: "2026-03-21", unit: "weeks", interval: 4, firstPerson: "Dino", builtIn: true },
+  { seedKey: "seed-8", name: "Müll rausbringen", startDate: "2026-03-16", unit: "weeks", interval: 1, firstPerson: "Dino", builtIn: true },
+  { seedKey: "seed-9", name: "Müll rausbringen", startDate: "2026-03-18", unit: "weeks", interval: 1, firstPerson: "Dino", builtIn: true },
+  { seedKey: "seed-10", name: "Müll rausbringen", startDate: "2026-03-20", unit: "weeks", interval: 1, firstPerson: "Laura", builtIn: true },
 ];
 
 let activeFilter = "all";
-let customTasks = [];
-let baseTasks = loadBaseTasks();
+let tasks = [];
 let syncTimer = null;
 let editingTaskId = null;
 
-function loadLocalCustomTasks() {
+function loadLocalTasks() {
   try {
     const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? JSON.parse(raw) : defaultTasks.map(cloneTask);
   } catch {
-    return [];
+    return defaultTasks.map(cloneTask);
   }
 }
 
-function saveCustomTasks() {
-  localStorage.setItem(storageKey, JSON.stringify(customTasks));
+function saveLocalTasks() {
+  localStorage.setItem(storageKey, JSON.stringify(tasks));
 }
 
-function loadBaseTasks() {
-  try {
-    const raw = localStorage.getItem(baseStorageKey);
-    return raw ? JSON.parse(raw) : [...defaultBaseTasks];
-  } catch {
-    return [...defaultBaseTasks];
-  }
-}
-
-function saveBaseTasks() {
-  localStorage.setItem(baseStorageKey, JSON.stringify(baseTasks));
-}
-
-async function loadCustomTasks() {
-  if (!supabaseClient) {
-    customTasks = loadLocalCustomTasks();
-    return;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("household_tasks")
-    .select("id, household_id, name, start_date, unit, interval, created_at")
-    .eq("household_id", supabaseConfig.householdId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    customTasks = loadLocalCustomTasks();
-    return;
-  }
-
-  customTasks = data.map((item) => ({
-    id: item.id,
-    name: item.name,
-    startDate: item.start_date,
-    unit: item.unit,
-    interval: item.interval,
-  }));
-  saveCustomTasks();
+function cloneTask(task) {
+  return {
+    id: task.id || task.seedKey || `${Date.now()}-${Math.random()}`,
+    seedKey: task.seedKey || null,
+    name: task.name,
+    startDate: task.startDate,
+    unit: task.unit,
+    interval: task.interval,
+    firstPerson: task.firstPerson || "Laura",
+    builtIn: Boolean(task.builtIn),
+  };
 }
 
 function toIsoDate(date) {
@@ -102,49 +74,71 @@ function titleCase(input) {
   return input.charAt(0).toUpperCase() + input.slice(1);
 }
 
-function buildBaseSchedule() {
-  const days = [];
-
-  for (let offset = 0; offset < totalWeeks * 7; offset += 1) {
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + offset);
-    const weekIndex = Math.floor(offset / 7);
-    const dayOfWeek = date.getDay();
-
-    const entry = {
-      iso: toIsoDate(date),
-      title: titleCase(monthFormatter.format(date)),
-      Laura: [],
-      Dino: [],
-      note: "",
-    };
-
-    days.push(entry);
-  }
-
-  const occurrences = {};
-  baseTasks.forEach((task) => {
-    occurrences[task.id] = 0;
-  });
-
-  days.forEach((day) => {
-    baseTasks.forEach((task) => {
-      if (!matchesRecurrence(task, day)) {
-        return;
-      }
-
-      const occurrence = occurrences[task.id] || 0;
-      const assignedPerson = occurrence % 2 === 0 ? task.firstPerson : oppositePerson(task.firstPerson);
-      day[assignedPerson].push(task.name);
-      occurrences[task.id] = occurrence + 1;
-    });
-  });
-
-  return days;
-}
-
 function oppositePerson(person) {
   return person === "Laura" ? "Dino" : "Laura";
+}
+
+async function loadTasks() {
+  if (!supabaseClient) {
+    tasks = loadLocalTasks();
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("household_tasks")
+    .select("*")
+    .eq("household_id", supabaseConfig.householdId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    tasks = loadLocalTasks();
+    return;
+  }
+
+  if (!data.length) {
+    await seedDefaultTasks();
+    return;
+  }
+
+  tasks = data.map((item) => ({
+    id: item.id,
+    seedKey: item.seed_key || null,
+    name: item.name,
+    startDate: item.start_date,
+    unit: item.unit,
+    interval: item.interval,
+    firstPerson: item.first_person || "Laura",
+    builtIn: Boolean(item.built_in),
+  }));
+  saveLocalTasks();
+}
+
+async function seedDefaultTasks() {
+  if (!supabaseClient) {
+    tasks = defaultTasks.map(cloneTask);
+    saveLocalTasks();
+    return;
+  }
+
+  const payload = defaultTasks.map((task) => ({
+    household_id: supabaseConfig.householdId,
+    seed_key: task.seedKey,
+    name: task.name,
+    start_date: task.startDate,
+    unit: task.unit,
+    interval: task.interval,
+    first_person: task.firstPerson,
+    built_in: true,
+  }));
+
+  const { error } = await supabaseClient.from("household_tasks").insert(payload);
+  if (error) {
+    tasks = defaultTasks.map(cloneTask);
+    saveLocalTasks();
+    return;
+  }
+
+  await loadTasks();
 }
 
 function matchesRecurrence(task, day) {
@@ -180,67 +174,43 @@ function matchesRecurrence(task, day) {
   return false;
 }
 
-function getTotalsFromIndex(schedule, startIndex) {
-  const totals = { Laura: 0, Dino: 0 };
+function buildSchedule() {
+  const days = [];
 
-  for (let index = startIndex; index < schedule.length; index += 1) {
-    totals.Laura += schedule[index].Laura.length;
-    totals.Dino += schedule[index].Dino.length;
+  for (let offset = 0; offset < totalWeeks * 7; offset += 1) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + offset);
+
+    days.push({
+      iso: toIsoDate(date),
+      title: titleCase(monthFormatter.format(date)),
+      Laura: [],
+      Dino: [],
+    });
   }
 
-  return totals;
-}
-
-function applyCustomTasks(schedule) {
-  const sortedTasks = [...customTasks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-
-  sortedTasks.forEach((task) => {
-    const matchingIndexes = [];
-
-    schedule.forEach((day, index) => {
-      if (matchesRecurrence(task, day)) {
-        matchingIndexes.push(index);
-      }
-    });
-
-    if (!matchingIndexes.length) {
-      return;
-    }
-
-    const totals = getTotalsFromIndex(schedule, matchingIndexes[0]);
-    let nextPerson = totals.Laura <= totals.Dino ? "Laura" : "Dino";
-
-    matchingIndexes.forEach((index) => {
-      schedule[index][nextPerson].push(task.name);
-      nextPerson = nextPerson === "Laura" ? "Dino" : "Laura";
-    });
+  const counts = {};
+  tasks.forEach((task) => {
+    counts[task.id] = 0;
   });
 
-  return schedule;
-}
-
-function buildSchedule() {
-  return applyCustomTasks(buildBaseSchedule());
-}
-
-function buildTaskSummary(schedule) {
-  const map = new Map();
-
-  schedule.forEach((day) => {
-    people.forEach((person) => {
-      day[person].forEach((task) => {
-        if (!map.has(task)) {
-          map.set(task, { task, Laura: 0, Dino: 0, total: 0 });
+  tasks
+    .slice()
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "de"))
+    .forEach((task) => {
+      days.forEach((day) => {
+        if (!matchesRecurrence(task, day)) {
+          return;
         }
 
-        const entry = map.get(task);
-        entry[person] += 1;
-        entry.total += 1;
+        const occurrence = counts[task.id] || 0;
+        const person = occurrence % 2 === 0 ? task.firstPerson : oppositePerson(task.firstPerson);
+        day[person].push(task.name);
+        counts[task.id] = occurrence + 1;
       });
     });
-  });
 
-  return Array.from(map.values()).sort((a, b) => a.task.localeCompare(b.task, "de"));
+  return days;
 }
 
 function getVisibleDays(schedule) {
@@ -276,49 +246,41 @@ function buildStats(visibleDays) {
     .join("");
 }
 
-function renderTaskOverview(taskSummary) {
-  const container = document.getElementById("task-overview");
-  const visibleTasks =
-    activeFilter === "all"
-      ? taskSummary
-      : taskSummary.filter((item) => item[activeFilter] > 0);
+function describeRecurrence(task) {
+  const units = {
+    days: task.interval === 1 ? "jeden Tag" : `alle ${task.interval} Tage`,
+    weeks: task.interval === 1 ? "jede Woche" : `alle ${task.interval} Wochen`,
+    months: task.interval === 1 ? "jeden Monat" : `alle ${task.interval} Monate`,
+  };
 
-  container.innerHTML = visibleTasks
-    .map((item) => {
-      const meta =
-        activeFilter === "all"
-          ? `Laura: ${item.Laura} | Dino: ${item.Dino} | Gesamt: ${item.total}`
-          : `${activeFilter}: ${item[activeFilter]} mal`;
-
-      return `
-        <article class="task-box">
-          <h4>${item.task}</h4>
-          <p class="task-meta">${meta}</p>
-        </article>
-      `;
-    })
-    .join("");
+  return `Ab ${task.startDate} | ${units[task.unit]} | Start: ${task.firstPerson}`;
 }
 
-function renderCustomTaskList() {
+function renderTaskList() {
   const list = document.getElementById("custom-task-items");
+  const visibleTasks =
+    activeFilter === "all"
+      ? tasks
+      : tasks.filter((task) => task.firstPerson === activeFilter || task.firstPerson === oppositePerson(activeFilter));
 
-  if (!customTasks.length) {
-    list.innerHTML = '<p class="empty">Noch keine eigenen Aufgaben hinzugefügt.</p>';
+  if (!visibleTasks.length) {
+    list.innerHTML = '<p class="empty">Noch keine Aufgaben vorhanden.</p>';
     return;
   }
 
-  list.innerHTML = customTasks
+  list.innerHTML = visibleTasks
+    .slice()
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "de"))
     .map(
       (task) => `
         <article class="custom-task-item">
           <div>
-            <strong>${task.name}</strong>
+            <strong>${task.name}${task.builtIn ? " (Grundaufgabe)" : ""}</strong>
             <p>${describeRecurrence(task)}</p>
           </div>
           <div class="task-actions">
             <button class="edit-task" type="button" data-task-id="${task.id}">Bearbeiten</button>
-            <button class="delete-task" type="button" data-task-id="${task.id}">Entfernen</button>
+            <button class="delete-task" type="button" data-task-id="${task.id}">Löschen</button>
           </div>
         </article>
       `
@@ -326,14 +288,12 @@ function renderCustomTaskList() {
     .join("");
 
   document.querySelectorAll(".edit-task").forEach((button) => {
-    button.addEventListener("click", () => {
-      startEditingTask(button.dataset.taskId);
-    });
+    button.addEventListener("click", () => startEditingTask(button.dataset.taskId));
   });
 
   document.querySelectorAll(".delete-task").forEach((button) => {
     button.addEventListener("click", async () => {
-      await deleteCustomTask(button.dataset.taskId);
+      await deleteTask(button.dataset.taskId);
       if (editingTaskId === button.dataset.taskId) {
         resetTaskForm();
       }
@@ -342,83 +302,14 @@ function renderCustomTaskList() {
   });
 }
 
-function renderBaseTaskList() {
-  const list = document.getElementById("base-task-items");
-
-  list.innerHTML = baseTasks
-    .map(
-      (task) => `
-        <article class="custom-task-item">
-          <div>
-            <strong>${task.name}</strong>
-            <p>${describeRecurrence(task)} | Start: ${task.firstPerson}</p>
-          </div>
-          <div class="task-actions">
-            <button class="edit-base-task" type="button" data-task-id="${task.id}">Umbenennen</button>
-            <button class="delete-base-task" type="button" data-task-id="${task.id}">Löschen</button>
-            <button class="reset-task" type="button" data-task-id="${task.id}">Standardname</button>
-          </div>
-        </article>
-      `
-    )
-    .join("");
-
-  document.querySelectorAll(".edit-base-task").forEach((button) => {
-    button.addEventListener("click", () => {
-      const task = baseTasks.find((item) => item.id === button.dataset.taskId);
-      if (!task) return;
-      const newName = window.prompt("Neuer Name für diese Grundplan-Aufgabe:", task.name);
-      if (!newName || !newName.trim()) return;
-      baseTasks = baseTasks.map((item) =>
-        item.id === task.id ? { ...item, name: newName.trim() } : item
-      );
-      saveBaseTasks();
-      renderApp();
-    });
-  });
-
-  document.querySelectorAll(".delete-base-task").forEach((button) => {
-    button.addEventListener("click", () => {
-      baseTasks = baseTasks.filter((item) => item.id !== button.dataset.taskId);
-      saveBaseTasks();
-      renderApp();
-    });
-  });
-
-  document.querySelectorAll(".reset-task").forEach((button) => {
-    button.addEventListener("click", () => {
-      const original = defaultBaseTasks.find((item) => item.id === button.dataset.taskId);
-      if (!original) return;
-      baseTasks = baseTasks.map((item) =>
-        item.id === original.id ? { ...item, name: original.name } : item
-      );
-      saveBaseTasks();
-      renderApp();
-    });
-  });
-}
-
-function describeRecurrence(task) {
-  const units = {
-    days: task.interval === 1 ? "jeden Tag" : `alle ${task.interval} Tage`,
-    weeks: task.interval === 1 ? "jede Woche" : `alle ${task.interval} Wochen`,
-    months: task.interval === 1 ? "jeden Monat" : `alle ${task.interval} Monate`,
-  };
-
-  return `Ab ${task.startDate} | ${units[task.unit]}`;
-}
-
 function renderList(schedule) {
   const list = document.getElementById("day-list");
   const stats = document.getElementById("stats");
   const today = getFallbackToday(schedule);
   const visibleDays = getVisibleDays(schedule);
-  const taskSummary = buildTaskSummary(schedule);
 
   stats.innerHTML = buildStats(visibleDays);
-  renderTaskOverview(taskSummary);
-  renderBaseTaskList();
-  renderCustomTaskList();
+  renderTaskList();
 
   list.innerHTML = visibleDays
     .map((day) => {
@@ -506,65 +397,97 @@ function bindAccordions() {
   });
 }
 
-async function upsertCustomTask(task) {
-  if (task.id && customTasks.some((item) => item.id === task.id)) {
-    return updateCustomTask(task);
+function getTotalsFromDate(startIso) {
+  const schedule = buildSchedule();
+  const startIndex = schedule.findIndex((day) => day.iso >= startIso);
+  const totals = { Laura: 0, Dino: 0 };
+
+  for (let index = Math.max(0, startIndex); index < schedule.length; index += 1) {
+    totals.Laura += schedule[index].Laura.length;
+    totals.Dino += schedule[index].Dino.length;
   }
 
+  return totals;
+}
+
+function computeFirstPerson(startIso) {
+  const totals = getTotalsFromDate(startIso);
+  return totals.Laura <= totals.Dino ? "Laura" : "Dino";
+}
+
+async function createTask(task) {
+  const newTask = {
+    ...task,
+    id: task.id || `${Date.now()}-${Math.random()}`,
+    firstPerson: task.firstPerson || computeFirstPerson(task.startDate),
+    builtIn: Boolean(task.builtIn),
+  };
+
   if (!supabaseClient) {
-    customTasks.push(task);
-    saveCustomTasks();
+    tasks.push(newTask);
+    saveLocalTasks();
     return;
   }
 
   const { error } = await supabaseClient.from("household_tasks").insert({
     household_id: supabaseConfig.householdId,
-    name: task.name,
-    start_date: task.startDate,
-    unit: task.unit,
-    interval: task.interval,
+    seed_key: newTask.seedKey || null,
+    name: newTask.name,
+    start_date: newTask.startDate,
+    unit: newTask.unit,
+    interval: newTask.interval,
+    first_person: newTask.firstPerson,
+    built_in: newTask.builtIn,
   });
 
   if (error) {
-    customTasks.push(task);
-    saveCustomTasks();
+    tasks.push(newTask);
+    saveLocalTasks();
     return;
   }
 
-  await loadCustomTasks();
+  await loadTasks();
 }
 
-async function updateCustomTask(task) {
+async function updateTask(task) {
+  const updatedTask = {
+    ...task,
+    builtIn: Boolean(task.builtIn),
+    firstPerson: task.firstPerson || computeFirstPerson(task.startDate),
+  };
+
   if (!supabaseClient) {
-    customTasks = customTasks.map((item) => (item.id === task.id ? task : item));
-    saveCustomTasks();
+    tasks = tasks.map((item) => (item.id === updatedTask.id ? updatedTask : item));
+    saveLocalTasks();
     return;
   }
 
   const { error } = await supabaseClient
     .from("household_tasks")
     .update({
-      name: task.name,
-      start_date: task.startDate,
-      unit: task.unit,
-      interval: task.interval,
+      name: updatedTask.name,
+      start_date: updatedTask.startDate,
+      unit: updatedTask.unit,
+      interval: updatedTask.interval,
+      first_person: updatedTask.firstPerson,
+      built_in: updatedTask.builtIn,
     })
-    .eq("id", task.id)
+    .eq("id", updatedTask.id)
     .eq("household_id", supabaseConfig.householdId);
 
   if (error) {
-    customTasks = customTasks.map((item) => (item.id === task.id ? task : item));
-    saveCustomTasks();
+    tasks = tasks.map((item) => (item.id === updatedTask.id ? updatedTask : item));
+    saveLocalTasks();
     return;
   }
 
-  await loadCustomTasks();
+  await loadTasks();
 }
 
-async function deleteCustomTask(taskId) {
+async function deleteTask(taskId) {
   if (!supabaseClient) {
-    customTasks = customTasks.filter((task) => task.id !== taskId);
-    saveCustomTasks();
+    tasks = tasks.filter((task) => task.id !== taskId);
+    saveLocalTasks();
     return;
   }
 
@@ -575,16 +498,16 @@ async function deleteCustomTask(taskId) {
     .eq("household_id", supabaseConfig.householdId);
 
   if (error) {
-    customTasks = customTasks.filter((task) => task.id !== taskId);
-    saveCustomTasks();
+    tasks = tasks.filter((task) => task.id !== taskId);
+    saveLocalTasks();
     return;
   }
 
-  await loadCustomTasks();
+  await loadTasks();
 }
 
 function startEditingTask(taskId) {
-  const task = customTasks.find((item) => item.id === taskId);
+  const task = tasks.find((item) => item.id === taskId);
   if (!task) {
     return;
   }
@@ -595,7 +518,7 @@ function startEditingTask(taskId) {
   document.getElementById("task-start-date").value = task.startDate;
   document.querySelector('#task-form select[name="unit"]').value = task.unit;
   document.querySelector('#task-form input[name="interval"]').value = task.interval;
-  document.getElementById("task-submit-button").textContent = "Aufgabe aktualisieren";
+  document.getElementById("task-submit-button").textContent = "Task aktualisieren";
   document.getElementById("task-cancel-edit").classList.remove("hidden");
   document.getElementById("custom-task-list").classList.remove("hidden");
   document.querySelector('[data-accordion="custom-task-list"]').setAttribute("aria-expanded", "true");
@@ -615,8 +538,8 @@ function resetTaskForm() {
 
 function bindTaskForm() {
   const openButton = document.getElementById("open-task-form");
-  const customTaskSection = document.getElementById("custom-task-list");
-  const customTaskToggle = document.querySelector('[data-accordion="custom-task-list"]');
+  const taskSection = document.getElementById("custom-task-list");
+  const taskToggle = document.querySelector('[data-accordion="custom-task-list"]');
   const form = document.getElementById("task-form");
   const dateInput = document.getElementById("task-start-date");
   const cancelButton = document.getElementById("task-cancel-edit");
@@ -624,8 +547,8 @@ function bindTaskForm() {
   dateInput.value = startDate.toISOString().slice(0, 10);
 
   openButton.addEventListener("click", () => {
-    customTaskSection.classList.remove("hidden");
-    customTaskToggle.setAttribute("aria-expanded", "true");
+    taskSection.classList.remove("hidden");
+    taskToggle.setAttribute("aria-expanded", "true");
     document.getElementById("task-name").focus();
   });
 
@@ -633,19 +556,29 @@ function bindTaskForm() {
     event.preventDefault();
 
     const formData = new FormData(form);
+    const rawId = String(formData.get("id") || "");
+    const existingTask = tasks.find((task) => task.id === rawId);
     const task = {
-      id: String(formData.get("id") || `${Date.now()}`),
+      id: rawId || undefined,
+      seedKey: existingTask?.seedKey || null,
       name: String(formData.get("name")).trim(),
       startDate: String(formData.get("startDate")),
       unit: String(formData.get("unit")),
       interval: Math.max(1, Number(formData.get("interval")) || 1),
+      firstPerson: existingTask?.firstPerson || undefined,
+      builtIn: existingTask?.builtIn || false,
     };
 
     if (!task.name || !task.startDate) {
       return;
     }
 
-    await upsertCustomTask(task);
+    if (existingTask) {
+      await updateTask(task);
+    } else {
+      await createTask(task);
+    }
+
     resetTaskForm();
     await renderApp();
   });
@@ -665,13 +598,13 @@ async function startPolling() {
   }
 
   syncTimer = setInterval(async () => {
-    await loadCustomTasks();
+    await loadTasks();
     await renderApp();
   }, syncIntervalMs);
 }
 
 async function initApp() {
-  await loadCustomTasks();
+  await loadTasks();
   bindFilters();
   bindAccordions();
   bindTaskForm();
