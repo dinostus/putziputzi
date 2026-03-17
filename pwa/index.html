@@ -11,14 +11,43 @@
   <body>
     <main class="app-shell">
       <section class="hero">
-        <p class="eyebrow">Laura und Dino</p>
-        <h1>Putzplan</h1>
+        <div class="hero-top">
+          <div class="hero-left">
+            <div class="hero-weather" id="hero-weather">--°</div>
+            <div class="identity-switcher" id="identity-switcher" aria-label="Person wählen">
+              <button class="identity-button" data-person="Laura" type="button">Laura</button>
+              <button class="identity-button" data-person="Dino" type="button">Dino</button>
+            </div>
+          </div>
+          <div class="hero-tools">
+            <div class="theme-switcher" aria-label="Design wählen">
+              <button class="theme-button active-theme" id="light-theme-button" type="button" aria-label="Helles Design" title="Helles Design">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 4.5 13.7 8l3.8.6-2.7 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8L6.5 8.6 10.3 8 12 4.5Zm0 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0-12a1 1 0 0 1 1 1v1.2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm0 15.8a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.2a1 1 0 0 1 1-1ZM4 11a1 1 0 1 1 0 2H2.8a1 1 0 1 1 0-2H4Zm17.2 0a1 1 0 1 1 0 2H20a1 1 0 1 1 0-2h1.2ZM6.1 5.1a1 1 0 0 1 1.4 0l.8.8A1 1 0 0 1 6.9 7.3l-.8-.8a1 1 0 0 1 0-1.4Zm10.8 10.8a1 1 0 0 1 1.4 0l.8.8a1 1 0 1 1-1.4 1.4l-.8-.8a1 1 0 0 1 0-1.4ZM18.3 5.1a1 1 0 1 1 1.4 1.4l-.8.8a1 1 0 0 1-1.4-1.4l.8-.8ZM7.5 15.9a1 1 0 0 1 0 1.4l-.8.8a1 1 0 1 1-1.4-1.4l.8-.8a1 1 0 0 1 1.4 0Z"></path>
+                </svg>
+              </button>
+              <button class="theme-button" id="dark-theme-button" type="button" aria-label="Dunkles Design" title="Dunkles Design">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M14.5 2.2a1 1 0 0 1 .9 1.6 8.2 8.2 0 1 0 4.8 14.8 1 1 0 0 1 1.5 1 10.2 10.2 0 1 1-7.2-17.4Z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="today-card" id="today-card">
         <div>
           <p class="label">Heute</p>
-          <h2 id="today-date">-</h2>
+          <div class="today-date-row">
+            <button class="today-nav-button" id="today-prev" type="button" aria-label="Vorheriger Tag">
+              &#8592;
+            </button>
+            <h2 id="today-date">-</h2>
+            <button class="today-nav-button" id="today-next" type="button" aria-label="Nächster Tag">
+              &#8594;
+            </button>
+          </div>
         </div>
         <div class="chips today-chips" role="tablist" aria-label="Filter">
           <button class="chip active" data-filter="all" type="button">Alle</button>
@@ -39,15 +68,14 @@
         </section>
       </section>
 
-      <section class="stats" id="stats"></section>
-
       <section class="dropdown-section">
         <button class="dropdown-summary" type="button" data-accordion="custom-task-list" aria-expanded="false">
-          <p class="label">Tasks</p>
-          <h3>Alle Aufgaben bearbeiten</h3>
+          <p class="label">Aufgaben</p>
         </button>
         <section class="custom-task-list accordion-content hidden" id="custom-task-list">
-          <form class="task-form inline-task-form" id="task-form">
+          <button class="primary-button add-task-button" id="show-task-form" type="button">Aufgabe hinzufügen</button>
+
+          <form class="task-form inline-task-form hidden" id="task-form">
             <input id="task-id" name="id" type="hidden" />
             <label>
               <span>Name</span>
@@ -77,6 +105,7 @@
 
             <div class="form-actions">
               <button class="primary-button" id="task-submit-button" type="submit">Aufgabe speichern</button>
+              <button class="ghost-button" id="task-close-form" type="button">Schließen</button>
               <button class="ghost-button hidden" id="task-cancel-edit" type="button">Bearbeiten abbrechen</button>
             </div>
           </form>
@@ -88,9 +117,46 @@
       <section class="dropdown-section">
         <button class="dropdown-summary" type="button" data-accordion="day-list" aria-expanded="false">
           <p class="label">Tagesplan</p>
-          <h3>Alle Aufgaben im Blick</h3>
         </button>
-        <section class="day-list accordion-content hidden" id="day-list"></section>
+        <section class="accordion-content hidden" id="day-list">
+          <div class="day-list-toolbar">
+            <button class="calendar-button" id="open-day-picker" type="button" aria-label="Tag im Kalender auswählen">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M7 2h2v3H7V2zm8 0h2v3h-2V2zM4 5h16a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 5v10h16V10H4zm3 3h3v3H7v-3z"></path>
+              </svg>
+              <span>Kalender</span>
+            </button>
+            <button class="ghost-button" id="reset-day-picker" type="button">Heute</button>
+            <button class="ghost-button" id="show-past-days" type="button">Vergangenheit</button>
+            <input class="hidden-date-input" id="day-picker-input" type="date" />
+            <p class="selected-day-label hidden" id="selected-day-label"></p>
+          </div>
+          <section class="day-list-items" id="day-list-items"></section>
+        </section>
+      </section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="chat-panel" aria-expanded="false">
+          <p class="label">Chat</p>
+        </button>
+        <section class="accordion-content hidden" id="chat-panel">
+          <section class="chat-panel">
+            <div class="chat-messages" id="chat-messages"></div>
+            <form class="chat-form" id="chat-form">
+              <input id="chat-input" type="text" maxlength="400" placeholder="Nachricht schreiben..." required />
+              <button class="primary-button" type="submit">Senden</button>
+            </form>
+          </section>
+        </section>
+      </section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="stats-panel" aria-expanded="false">
+          <p class="label">Statistik</p>
+        </button>
+        <section class="accordion-content hidden" id="stats-panel">
+          <section class="stats" id="stats"></section>
+        </section>
       </section>
     </main>
 
