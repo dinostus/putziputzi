@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wettervorschau</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      body {
+        padding: 24px;
+      }
+
+      .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+
+      .preview-card {
+        display: grid;
+        gap: 10px;
+      }
+
+      .preview-label {
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .preview-sky {
+        min-height: 150px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .preview-sky::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 240ms ease;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell" style="width: min(1200px, 100%); padding: 0;">
+      <section class="dropdown-section" style="padding: 20px;">
+        <p class="label">Vorschau</p>
+        <h1 style="font-size: 1.8rem; margin-top: 6px;">Wettervarianten</h1>
+      </section>
+
+      <section class="preview-grid" style="margin-top: 20px;">
+        <article class="preview-card">
+          <div class="preview-label">Klarer Tag</div>
+          <div class="preview-sky hero weather-clear"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Bewölkter Tag</div>
+          <div class="preview-sky hero weather-cloudy"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Regen</div>
+          <div class="preview-sky hero weather-rain"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Nebel</div>
+          <div class="preview-sky hero weather-fog"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Schnee</div>
+          <div class="preview-sky hero weather-snow"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Sturm</div>
+          <div class="preview-sky hero weather-storm"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Klare Nacht</div>
+          <div class="preview-sky hero weather-clear weather-night"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Bewölkte Nacht</div>
+          <div class="preview-sky hero weather-cloudy weather-night"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Regennacht</div>
+          <div class="preview-sky hero weather-rain weather-night"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Neblige Nacht</div>
+          <div class="preview-sky hero weather-fog weather-night"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Schneenacht</div>
+          <div class="preview-sky hero weather-snow weather-night"></div>
+        </article>
+        <article class="preview-card">
+          <div class="preview-label">Stürmische Nacht</div>
+          <div class="preview-sky hero weather-storm weather-night"></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

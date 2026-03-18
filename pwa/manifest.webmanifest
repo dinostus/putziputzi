@@ -1,23 +1,23 @@
 {
-  "name": "Putzplan",
-  "short_name": "Putzplan",
+  "name": "putziputzi",
+  "short_name": "putziputzi",
   "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#f6f1e8",
-  "theme_color": "#6f8f72",
+  "display": "fullscreen",
+  "background_color": "#fdf1f6",
+  "theme_color": "#fdf1f6",
   "description": "Mobiler Putzplan fuer Laura und Dino",
   "icons": [
     {
-      "src": "./icon-192.svg",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "./icon-512.svg",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

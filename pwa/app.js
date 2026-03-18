@@ -1,4 +1,4 @@
-const initialStartDate = new Date("2026-03-16T00:00:00");
+﻿const initialStartDate = new Date("2026-03-16T00:00:00");
 const scheduleDays = 365;
 const people = ["Laura", "Dino"];
 const storageKey = "putzplan-all-tasks";
@@ -7,7 +7,8 @@ const themeStorageKey = "putzplan-theme";
 const personStorageKey = "putzplan-person";
 const chatStorageKey = "putzplan-chat-messages";
 const syncIntervalMs = 15000;
-const defaultWeatherCoords = { latitude: 52.52, longitude: 13.405 };
+const weatherRefreshMs = 15 * 60 * 1000;
+const defaultWeatherCoords = { latitude: 48.3069, longitude: 14.2858 };
 const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
   day: "numeric",
@@ -46,6 +47,7 @@ let activeFilter = "all";
 let tasks = [];
 let completions = {};
 let syncTimer = null;
+let weatherTimer = null;
 let editingTaskId = null;
 let selectedDayIso = null;
 let expandedTaskStat = null;
@@ -55,7 +57,7 @@ let activeTheme = "light";
 let currentTodayIso = null;
 let currentPerson = "Laura";
 let chatMessages = [];
-let currentWeather = { temperature: null, variant: "clear" };
+let currentWeather = { temperature: null, variant: "clear", isDay: true };
 
 function loadLocalTasks() {
   try {
@@ -202,6 +204,7 @@ function renderHeroWeather() {
 
   hero.classList.remove("weather-clear", "weather-cloudy", "weather-rain", "weather-fog", "weather-snow", "weather-storm");
   hero.classList.add(`weather-${currentWeather.variant || "clear"}`);
+  hero.classList.toggle("weather-night", currentWeather.isDay === false);
   weatherElement.textContent =
     typeof currentWeather.temperature === "number" ? `${Math.round(currentWeather.temperature)}°` : "--°";
 }
@@ -232,7 +235,7 @@ async function loadWeather() {
     const params = new URLSearchParams({
       latitude: String(coords.latitude),
       longitude: String(coords.longitude),
-      current: "temperature_2m,weather_code",
+      current: "temperature_2m,weather_code,is_day",
       timezone: "auto",
     });
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
@@ -244,9 +247,10 @@ async function loadWeather() {
     currentWeather = {
       temperature: data?.current?.temperature_2m ?? null,
       variant: classifyWeatherVariant(data?.current?.weather_code),
+      isDay: data?.current?.is_day !== 0,
     };
   } catch {
-    currentWeather = { temperature: null, variant: "clear" };
+    currentWeather = { temperature: null, variant: "clear", isDay: true };
   }
 }
 
@@ -570,17 +574,12 @@ function getTaskTypeTotals(days) {
 }
 
 function buildStats(schedule) {
-  const nextTenDays = getDayListDays(schedule);
-  const nextTenTotals = getPersonTaskTotals(nextTenDays);
-  const taskTypeTotals = getTaskTypeTotals(schedule).slice(0, 8);
+  const taskTypeTotals = getTaskTypeTotals(schedule);
+  const skyClass = `weather-${currentWeather.variant || "clear"}${currentWeather.isDay === false ? " weather-night" : ""}`;
 
   return `
     <section class="stats-grid">
-      <article class="stat-box stat-box-wide">
-        <span>Nächste 10 Tage</span>
-        <strong>Laura ${nextTenTotals.Laura} | Dino ${nextTenTotals.Dino}</strong>
-        <p>${nextTenDays.length} Tage sichtbar</p>
-      </article>
+      <article class="stat-box stat-box-wide stats-sky-card ${skyClass}" aria-hidden="true"></article>
     </section>
     <section class="stats-task-types">
       <div class="stats-section-head">
@@ -608,7 +607,6 @@ function buildStats(schedule) {
     </section>
   `;
 }
-
 function renderChat() {
   const container = document.getElementById("chat-messages");
 
@@ -817,7 +815,7 @@ function renderDayPickerState(schedule) {
   if (!hasSelectedDay) {
     label.textContent = "";
     label.classList.add("hidden");
-    pickerInput.value = "";
+    pickerInput.value = toIsoDate(new Date());
     return;
   }
 
@@ -847,24 +845,40 @@ function renderToday(schedule) {
   currentTodayIso = today.iso;
   document.getElementById("today-date").textContent = today.title;
   const todaySummaryElement = document.getElementById("today-summary");
+  const visibleItems = getTodayVisibleItems(today);
 
-  const summaries = [];
-  if ((activeFilter === "all" || activeFilter === "Laura") && today.Laura.length) {
-    summaries.push(`Laura: ${today.Laura.map((item) => item.name).join(", ")}`);
-  }
-  if ((activeFilter === "all" || activeFilter === "Dino") && today.Dino.length) {
-    summaries.push(`Dino: ${today.Dino.map((item) => item.name).join(", ")}`);
+  if (!visibleItems.length) {
+    todaySummaryElement.innerHTML = '<p class="empty">Heute sind keine Extra-Aufgaben eingeplant.</p>';
+    return;
   }
 
-  if (!summaries.length) {
-    todaySummaryElement.textContent = "Heute sind keine Extra-Aufgaben eingeplant.";
-  } else if (activeFilter === "all") {
-    todaySummaryElement.innerHTML = summaries.map((entry) => `<span>${entry}</span>`).join("");
-  } else {
-    todaySummaryElement.textContent = summaries.join(" | ");
-  }
+  todaySummaryElement.innerHTML = visibleItems
+    .map((item) => {
+      const done = Boolean(completions[item.key]);
+      return `
+        <button class="today-task-button ${done ? "done" : ""}" type="button" data-completion-key="${item.key}" data-done="${done ? "true" : "false"}">
+          <span class="${done ? "done-text" : ""}">${item.person}: ${item.name}</span>
+        </button>
+      `;
+    })
+    .join("");
 
-  renderTodayChecklist(today);
+  todaySummaryElement.querySelectorAll(".today-task-button").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const isDone = button.dataset.done === "true";
+      const nextValue = !isDone;
+
+      if (nextValue) {
+        const confirmed = window.confirm("Ist diese Aufgabe wirklich erledigt?");
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      await setCompletion(button.dataset.completionKey, nextValue);
+      await renderApp();
+    });
+  });
 }
 
 async function renderApp() {
@@ -885,45 +899,15 @@ function getTodayVisibleItems(today) {
   return items;
 }
 
-function renderTodayChecklist(today) {
-  const container = document.getElementById("today-checklist");
-  const visibleItems = getTodayVisibleItems(today);
+function bindFilters() {
+  const chips = document.querySelectorAll(".chip");
 
-  if (!visibleItems.length) {
-    container.innerHTML = '<p class="empty">Heute gibt es nichts zum Abhaken.</p>';
+  if (!chips.length) {
+    activeFilter = "all";
     return;
   }
 
-  container.innerHTML = visibleItems
-    .map((item) => {
-      const done = Boolean(completions[item.key]);
-      return `
-        <label class="today-check-item ${done ? "done" : ""}">
-          <input type="checkbox" data-completion-key="${item.key}" ${done ? "checked" : ""} />
-          <span class="${done ? "done-text" : ""}">${item.person}: ${item.name}</span>
-        </label>
-      `;
-    })
-    .join("");
-
-  container.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-    checkbox.addEventListener("change", async () => {
-      if (checkbox.checked) {
-        const confirmed = window.confirm("Ist diese Aufgabe wirklich erledigt?");
-        if (!confirmed) {
-          checkbox.checked = false;
-          return;
-        }
-      }
-
-      await setCompletion(checkbox.dataset.completionKey, checkbox.checked);
-      await renderApp();
-    });
-  });
-}
-
-function bindFilters() {
-  document.querySelectorAll(".chip").forEach((button) => {
+  chips.forEach((button) => {
     button.addEventListener("click", () => {
       activeFilter = button.dataset.filter;
       document.querySelectorAll(".chip").forEach((chip) => {
@@ -942,21 +926,6 @@ function bindAccordions() {
       button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
       target.classList.toggle("hidden", isExpanded);
     });
-  });
-}
-
-function bindTodayChecklistToggle() {
-  const button = document.getElementById("today-checklist-toggle");
-  const checklist = document.getElementById("today-checklist");
-
-  if (!button || !checklist) {
-    return;
-  }
-
-  button.addEventListener("click", () => {
-    const isExpanded = button.getAttribute("aria-expanded") === "true";
-    button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
-    checklist.classList.toggle("hidden", isExpanded);
   });
 }
 
@@ -986,35 +955,49 @@ function bindTodayNavigation() {
 function bindDayPicker() {
   const openButton = document.getElementById("open-day-picker");
   const pickerInput = document.getElementById("day-picker-input");
+  const pickerWrap = document.getElementById("day-picker-wrap");
   const resetButton = document.getElementById("reset-day-picker");
   const pastButton = document.getElementById("show-past-days");
 
   openButton.addEventListener("click", () => {
+    if (!pickerInput.value) {
+      pickerInput.value = selectedDayIso || toIsoDate(new Date());
+    }
+
     if (typeof pickerInput.showPicker === "function") {
+      pickerWrap.classList.remove("hidden");
       pickerInput.showPicker();
       return;
     }
 
-    pickerInput.click();
+    const willOpen = pickerWrap.classList.contains("hidden");
+    pickerWrap.classList.toggle("hidden");
+
+    if (willOpen) {
+      pickerInput.focus();
+    }
   });
 
   pickerInput.addEventListener("change", async () => {
     dayListMode = "upcoming";
     selectedDayIso = pickerInput.value || null;
+    pickerWrap.classList.add("hidden");
     await renderApp();
   });
 
   resetButton.addEventListener("click", async () => {
     dayListMode = "upcoming";
     selectedDayIso = null;
-    pickerInput.value = "";
+    pickerInput.value = toIsoDate(new Date());
+    pickerWrap.classList.add("hidden");
     await renderApp();
   });
 
   pastButton.addEventListener("click", async () => {
     dayListMode = "past";
     selectedDayIso = null;
-    pickerInput.value = "";
+    pickerInput.value = toIsoDate(new Date());
+    pickerWrap.classList.add("hidden");
     await renderApp();
   });
 }
@@ -1335,6 +1318,24 @@ async function startPolling() {
   }, syncIntervalMs);
 }
 
+function startWeatherRefresh() {
+  if (weatherTimer) {
+    clearInterval(weatherTimer);
+  }
+
+  weatherTimer = setInterval(async () => {
+    await loadWeather();
+    renderHeroWeather();
+  }, weatherRefreshMs);
+
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible") {
+      await loadWeather();
+      renderHeroWeather();
+    }
+  });
+}
+
 async function initApp() {
   applyTheme(loadLocalTheme());
   currentPerson = loadLocalPerson();
@@ -1345,7 +1346,6 @@ async function initApp() {
   currentTodayIso = toIsoDate(new Date());
   bindFilters();
   bindAccordions();
-  bindTodayChecklistToggle();
   bindTodayNavigation();
   bindDayPicker();
   bindThemeButtons();
@@ -1355,6 +1355,7 @@ async function initApp() {
   applyPerson(currentPerson);
   await renderApp();
   await startPolling();
+  startWeatherRefresh();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -1364,3 +1365,4 @@ async function initApp() {
 }
 
 window.addEventListener("DOMContentLoaded", initApp);
+

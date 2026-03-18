@@ -2,9 +2,13 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#6f8f72" />
-    <title>Putzplan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#fdf1f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181017" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="putziputzi" />
+    <title>putziputzi</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -23,7 +27,7 @@
             <div class="theme-switcher" aria-label="Design wählen">
               <button class="theme-button active-theme" id="light-theme-button" type="button" aria-label="Helles Design" title="Helles Design">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 4.5 13.7 8l3.8.6-2.7 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8L6.5 8.6 10.3 8 12 4.5Zm0 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0-12a1 1 0 0 1 1 1v1.2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm0 15.8a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.2a1 1 0 0 1 1-1ZM4 11a1 1 0 1 1 0 2H2.8a1 1 0 1 1 0-2H4Zm17.2 0a1 1 0 1 1 0 2H20a1 1 0 1 1 0-2h1.2ZM6.1 5.1a1 1 0 0 1 1.4 0l.8.8A1 1 0 0 1 6.9 7.3l-.8-.8a1 1 0 0 1 0-1.4Zm10.8 10.8a1 1 0 0 1 1.4 0l.8.8a1 1 0 1 1-1.4 1.4l-.8-.8a1 1 0 0 1 0-1.4ZM18.3 5.1a1 1 0 1 1 1.4 1.4l-.8.8a1 1 0 0 1-1.4-1.4l.8-.8ZM7.5 15.9a1 1 0 0 1 0 1.4l-.8.8a1 1 0 1 1-1.4-1.4l.8-.8a1 1 0 0 1 1.4 0Z"></path>
+                  <path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M18.5 5.5l-1.9 1.9M7.4 16.6l-1.9 1.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
                 </svg>
               </button>
               <button class="theme-button" id="dark-theme-button" type="button" aria-label="Dunkles Design" title="Dunkles Design">
@@ -49,23 +53,7 @@
             </button>
           </div>
         </div>
-        <div class="chips today-chips" role="tablist" aria-label="Filter">
-          <button class="chip active" data-filter="all" type="button">Alle</button>
-          <button class="chip" data-filter="Laura" type="button">Laura</button>
-          <button class="chip" data-filter="Dino" type="button">Dino</button>
-        </div>
-        <p class="today-summary" id="today-summary">Plan wird geladen...</p>
-        <section class="today-tasks-wrap">
-          <button
-            class="today-dropdown-button"
-            id="today-checklist-toggle"
-            type="button"
-            aria-expanded="false"
-          >
-            Aufgaben abhaken
-          </button>
-          <section class="today-checklist hidden" id="today-checklist"></section>
-        </section>
+        <section class="today-summary" id="today-summary">Plan wird geladen...</section>
       </section>
 
       <section class="dropdown-section">
@@ -105,8 +93,8 @@
 
             <div class="form-actions">
               <button class="primary-button" id="task-submit-button" type="submit">Aufgabe speichern</button>
-              <button class="ghost-button" id="task-close-form" type="button">Schließen</button>
-              <button class="ghost-button hidden" id="task-cancel-edit" type="button">Bearbeiten abbrechen</button>
+              <button class="ghost-button" id="task-close-form" type="button">schließen</button>
+              <button class="ghost-button hidden" id="task-cancel-edit" type="button">abbrechen</button>
             </div>
           </form>
 
@@ -124,11 +112,12 @@
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M7 2h2v3H7V2zm8 0h2v3h-2V2zM4 5h16a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 5v10h16V10H4zm3 3h3v3H7v-3z"></path>
               </svg>
-              <span>Kalender</span>
             </button>
             <button class="ghost-button" id="reset-day-picker" type="button">Heute</button>
             <button class="ghost-button" id="show-past-days" type="button">Vergangenheit</button>
-            <input class="hidden-date-input" id="day-picker-input" type="date" />
+            <div class="day-picker-wrap hidden" id="day-picker-wrap">
+              <input class="day-picker-input" id="day-picker-input" type="date" />
+            </div>
             <p class="selected-day-label hidden" id="selected-day-label"></p>
           </div>
           <section class="day-list-items" id="day-list-items"></section>
