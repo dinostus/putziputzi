@@ -14,6 +14,10 @@ const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   day: "numeric",
   month: "long",
 });
+const calendarMonthFormatter = new Intl.DateTimeFormat("de-DE", {
+  month: "long",
+  year: "numeric",
+});
 const chatTimeFormatter = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
   month: "2-digit",
@@ -430,6 +434,10 @@ function getScheduleStartDate() {
   return earliestTaskDate < initialStartDate ? earliestTaskDate : new Date(initialStartDate);
 }
 
+function isLegacyFloorMopTask(task) {
+  return task.seedKey === "seed-7" || task.name === "staubsaugen + Boden nass";
+}
+
 function choosePersonForTask(task, day, taskCounts, overallCounts, occurrence) {
   const perTaskCounts = taskCounts[task.id] || { Laura: 0, Dino: 0 };
   const dayCounts = {
@@ -456,6 +464,10 @@ function choosePersonForTask(task, day, taskCounts, overallCounts, occurrence) {
   return occurrence % 2 === 0 ? task.firstPerson || "Laura" : oppositePerson(task.firstPerson || "Laura");
 }
 
+function choosePersonForDeepClean(specialOccurrence) {
+  return specialOccurrence % 2 === 0 ? "Laura" : "Dino";
+}
+
 function buildSchedule() {
   const days = [];
   const scheduleStartDate = getScheduleStartDate();
@@ -480,6 +492,7 @@ function buildSchedule() {
 
   tasks
     .slice()
+    .filter((task) => !isLegacyFloorMopTask(task))
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "de"))
     .forEach((task) => {
       days.forEach((day) => {
@@ -489,10 +502,15 @@ function buildSchedule() {
 
         const perTaskCounts = counts[task.id] || { Laura: 0, Dino: 0 };
         const occurrence = perTaskCounts.Laura + perTaskCounts.Dino;
-        const person = choosePersonForTask(task, day, counts, overallCounts, occurrence);
+        const isDeepClean = task.seedKey === "seed-2" && (occurrence + 1) % 4 === 0;
+        const specialOccurrence = isDeepClean ? Math.floor((occurrence + 1) / 4) - 1 : null;
+        const person = isDeepClean
+          ? choosePersonForDeepClean(specialOccurrence)
+          : choosePersonForTask(task, day, counts, overallCounts, occurrence);
+        const taskName = isDeepClean ? "staubsaugen + Boden nass" : task.name;
         const item = {
           taskId: task.id,
-          name: task.name,
+          name: taskName,
           key: `${day.iso}|${person}|${task.id}|${occurrence}`,
         };
         day[person].push(item);
@@ -666,12 +684,102 @@ function describeRecurrence(task) {
   return `Ab ${task.startDate} | ${units[task.unit]} | Start: ${task.firstPerson}`;
 }
 
-function renderTaskList() {
+function getTaskDisplayName(task) {
+  if (task.seedKey === "seed-2") {
+    return "staubsaugen (alle vier Wochen + nass)";
+  }
+
+  return task.name;
+}
+
+function getTaskOccurrences(task, schedule) {
+  const occurrences = [];
+
+  schedule.forEach((day) => {
+    day.Laura.forEach((item) => {
+      if (item.taskId === task.id) {
+        occurrences.push({ iso: day.iso, person: "Laura", name: item.name });
+      }
+    });
+
+    day.Dino.forEach((item) => {
+      if (item.taskId === task.id) {
+        occurrences.push({ iso: day.iso, person: "Dino", name: item.name });
+      }
+    });
+  });
+
+  return occurrences;
+}
+
+function buildTaskCalendar(task, schedule) {
+  const occurrences = getTaskOccurrences(task, schedule);
+  const occurrenceMap = new Map(occurrences.map((entry) => [entry.iso, entry]));
+  const today = new Date();
+  const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const months = [];
+
+  for (let monthOffset = 0; monthOffset < 3; monthOffset += 1) {
+    const monthDate = new Date(startMonth.getFullYear(), startMonth.getMonth() + monthOffset, 1);
+    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    const leadingBlankDays = (monthStart.getDay() + 6) % 7;
+    const cells = [];
+
+    for (let blank = 0; blank < leadingBlankDays; blank += 1) {
+      cells.push('<span class="task-calendar-day empty-day"></span>');
+    }
+
+    for (let dayNumber = 1; dayNumber <= monthEnd.getDate(); dayNumber += 1) {
+      const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayNumber);
+      const iso = toIsoDate(cellDate);
+      const occurrence = occurrenceMap.get(iso);
+      const personClass = occurrence ? (occurrence.person === "Laura" ? "laura-mark" : "dino-mark") : "";
+      const title = occurrence ? `${occurrence.person}: ${occurrence.name}` : "";
+
+      cells.push(`
+        <span class="task-calendar-day ${personClass}" title="${title}">
+          ${dayNumber}
+        </span>
+      `);
+    }
+
+    months.push(`
+      <section class="task-calendar-month">
+        <div class="task-calendar-title">${titleCase(calendarMonthFormatter.format(monthDate))}</div>
+        <div class="task-calendar-weekdays">
+          <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+        </div>
+        <div class="task-calendar-grid">
+          ${cells.join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  return `
+    <section class="task-calendar-wrap">
+      <div class="task-calendar-legend">
+        <span class="legend-pill legend-laura">Laura</span>
+        <span class="legend-pill legend-dino">Dino</span>
+      </div>
+      <div class="task-calendar-months">
+        ${months.join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskList(schedule) {
   const list = document.getElementById("custom-task-items");
   const visibleTasks =
     activeFilter === "all"
-      ? tasks
-      : tasks.filter((task) => task.firstPerson === activeFilter || task.firstPerson === oppositePerson(activeFilter));
+      ? tasks.filter((task) => !isLegacyFloorMopTask(task))
+      : tasks.filter(
+          (task) =>
+            !isLegacyFloorMopTask(task) &&
+            (task.firstPerson === activeFilter || task.firstPerson === oppositePerson(activeFilter))
+        );
 
   if (!visibleTasks.length) {
     list.innerHTML = '<p class="empty">Noch keine Aufgaben vorhanden.</p>';
@@ -685,7 +793,7 @@ function renderTaskList() {
       (task) => `
         <article class="custom-task-item">
           <div>
-            <strong>${task.name}</strong>
+            <strong>${getTaskDisplayName(task)}</strong>
           </div>
           <div class="task-actions">
             <button class="edit-task" type="button" data-task-id="${task.id}">Bearbeiten</button>
@@ -694,6 +802,7 @@ function renderTaskList() {
           </div>
           <section class="task-details ${expandedTaskId === task.id ? "" : "hidden"}">
             <p>${describeRecurrence(task)}</p>
+            ${buildTaskCalendar(task, schedule)}
           </section>
         </article>
       `
@@ -735,7 +844,7 @@ function renderList(schedule) {
 
   stats.innerHTML = buildStats(schedule);
   bindTaskStatToggles();
-  renderTaskList();
+  renderTaskList(schedule);
   renderChat();
   renderDayPickerState(schedule);
 

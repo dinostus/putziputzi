@@ -291,7 +291,7 @@ body[data-theme="dark"] .stats-sky-card.weather-storm {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 8px 12px;
-  background: var(--toolbar);
+  background: rgba(255, 215, 229, 0.68);
   color: var(--text);
   font-weight: 700;
   position: relative;
@@ -301,10 +301,25 @@ body[data-theme="dark"] .stats-sky-card.weather-storm {
   -webkit-appearance: none;
 }
 
+.identity-button[data-person="Dino"] {
+  background: rgba(208, 227, 255, 0.72);
+}
+
 .identity-button.active-identity {
-  background: var(--accent);
-  color: var(--button-on-accent);
-  border-color: var(--accent);
+  border-width: 2px;
+  border-color: #d97c9e;
+  box-shadow:
+    0 0 0 2px rgba(217, 124, 158, 0.22),
+    0 0 16px rgba(217, 124, 158, 0.26),
+    0 0 28px rgba(255, 215, 229, 0.24);
+}
+
+.identity-button[data-person="Dino"].active-identity {
+  border-color: #88addf;
+  box-shadow:
+    0 0 0 2px rgba(136, 173, 223, 0.24),
+    0 0 16px rgba(136, 173, 223, 0.28),
+    0 0 28px rgba(208, 227, 255, 0.24);
 }
 
 .theme-button {
@@ -919,6 +934,102 @@ body[data-theme="dark"] .day-card.today {
   display: flex;
   gap: 10px;
   flex-wrap: nowrap;
+}
+
+.task-calendar-wrap {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.task-calendar-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+}
+
+.legend-laura {
+  background: rgba(255, 215, 229, 0.68);
+}
+
+.legend-dino {
+  background: rgba(208, 227, 255, 0.72);
+}
+
+.task-calendar-months {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.task-calendar-month {
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+}
+
+.task-calendar-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.task-calendar-weekdays,
+.task-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.task-calendar-weekdays {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.task-calendar-day {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  background: transparent;
+  color: var(--text);
+}
+
+.task-calendar-day.empty-day {
+  visibility: hidden;
+}
+
+.task-calendar-day.laura-mark {
+  background: rgba(255, 215, 229, 0.78);
+}
+
+.task-calendar-day.dino-mark {
+  background: rgba(208, 227, 255, 0.82);
+}
+
+body[data-theme="dark"] .legend-laura,
+body[data-theme="dark"] .task-calendar-day.laura-mark {
+  background: rgba(255, 215, 229, 0.32);
+  color: #ffeef5;
+}
+
+body[data-theme="dark"] .legend-dino,
+body[data-theme="dark"] .task-calendar-day.dino-mark {
+  background: rgba(208, 227, 255, 0.28);
+  color: #eef6ff;
 }
 
 .primary-button {
