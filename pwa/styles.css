@@ -86,7 +86,7 @@ body[data-theme="dark"] {
   width: min(920px, 100%);
   margin: 0 auto;
   padding:
-    calc(24px + env(safe-area-inset-top, 0px))
+    calc(52px + env(safe-area-inset-top, 0px))
     calc(16px + env(safe-area-inset-right, 0px))
     calc(40px + env(safe-area-inset-bottom, 0px))
     calc(16px + env(safe-area-inset-left, 0px));
@@ -294,6 +294,11 @@ body[data-theme="dark"] .stats-sky-card.weather-storm {
   background: var(--toolbar);
   color: var(--text);
   font-weight: 700;
+  position: relative;
+  z-index: 2;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
 }
 
 .identity-button.active-identity {
@@ -314,6 +319,11 @@ body[data-theme="dark"] .stats-sky-card.weather-storm {
   background: var(--toolbar);
   color: var(--text);
   font-weight: 700;
+  position: relative;
+  z-index: 2;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
 }
 
 .theme-button svg {
@@ -326,14 +336,6 @@ body[data-theme="dark"] .stats-sky-card.weather-storm {
   background: var(--accent);
   color: var(--button-on-accent);
   border-color: var(--accent);
-}
-
-.hero-weather {
-  color: var(--text);
-  font-size: 1.25rem;
-  font-weight: 800;
-  order: 2;
-  align-self: flex-start;
 }
 
 .eyebrow,
@@ -816,17 +818,17 @@ h1 {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--accent-strong);
-  background: rgba(111, 143, 114, 0.12);
+  background: rgba(216, 124, 158, 0.16);
   border-radius: 999px;
   padding: 6px 10px;
 }
 
 body[data-theme="dark"] .date-badge {
-  background: rgba(127, 165, 140, 0.2);
+  background: rgba(216, 137, 167, 0.24);
 }
 
 body[data-theme="dark"] .day-card.today {
-  outline: 2px solid rgba(183, 211, 189, 0.4);
+  outline: 2px solid rgba(241, 186, 208, 0.42);
 }
 
 .columns {
@@ -848,11 +850,11 @@ body[data-theme="dark"] .day-card.today {
 }
 
 .person-box.laura {
-  background: rgba(246, 217, 139, 0.42);
+  background: rgba(255, 215, 229, 0.65);
 }
 
 .person-box.dino {
-  background: rgba(183, 219, 183, 0.42);
+  background: rgba(246, 215, 239, 0.65);
 }
 
 .task-list {
@@ -945,15 +947,30 @@ body[data-theme="dark"] .day-card.today {
   padding-top: 16px;
 }
 
+.chat-row {
+  display: flex;
+}
+
+.chat-row.other-row {
+  justify-content: flex-start;
+}
+
+.chat-row.own-row {
+  justify-content: flex-end;
+}
+
 .chat-message {
+  max-width: min(78%, 420px);
   padding: 12px 14px;
-  border-radius: 18px;
+  border-radius: 18px 18px 18px 6px;
   background: var(--surface-soft);
   border: 1px solid var(--line);
+  color: var(--text);
 }
 
 .chat-message.own-message {
-  background: var(--surface-alt);
+  border-radius: 18px 18px 6px 18px;
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface) 78%);
 }
 
 .chat-message-head {
@@ -963,6 +980,11 @@ body[data-theme="dark"] .day-card.today {
   margin-bottom: 6px;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.chat-message p {
+  margin: 0;
+  line-height: 1.4;
 }
 
 .chat-form {

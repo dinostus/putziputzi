@@ -156,6 +156,24 @@ function applyPerson(person) {
   saveLocalPerson();
 }
 
+function bindPress(element, handler) {
+  let lastTriggerAt = 0;
+
+  const onPress = async (event) => {
+    const now = Date.now();
+    if (now - lastTriggerAt < 350) {
+      return;
+    }
+
+    lastTriggerAt = now;
+    event.preventDefault();
+    await handler();
+  };
+
+  element.addEventListener("click", onPress);
+  element.addEventListener("touchend", onPress, { passive: false });
+}
+
 function toIsoDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -196,17 +214,14 @@ function classifyWeatherVariant(code) {
 
 function renderHeroWeather() {
   const hero = document.querySelector(".hero");
-  const weatherElement = document.getElementById("hero-weather");
 
-  if (!hero || !weatherElement) {
+  if (!hero) {
     return;
   }
 
   hero.classList.remove("weather-clear", "weather-cloudy", "weather-rain", "weather-fog", "weather-snow", "weather-storm");
   hero.classList.add(`weather-${currentWeather.variant || "clear"}`);
   hero.classList.toggle("weather-night", currentWeather.isDay === false);
-  weatherElement.textContent =
-    typeof currentWeather.temperature === "number" ? `${Math.round(currentWeather.temperature)}°` : "--°";
 }
 
 function getCurrentPositionOrFallback() {
@@ -625,12 +640,14 @@ function renderChat() {
     .map((message) => {
       const ownMessage = message.person === currentPerson;
       return `
-        <article class="chat-message ${ownMessage ? "own-message" : ""}">
-          <div class="chat-message-head">
-            <strong>${message.person}</strong>
-            <span>${chatTimeFormatter.format(new Date(message.createdAt))}</span>
+        <article class="chat-row ${ownMessage ? "own-row" : "other-row"}">
+          <div class="chat-message ${ownMessage ? "own-message" : ""}">
+            <div class="chat-message-head">
+              <strong>${message.person}</strong>
+              <span>${chatTimeFormatter.format(new Date(message.createdAt))}</span>
+            </div>
+            <p>${message.message}</p>
           </div>
-          <p>${message.message}</p>
         </article>
       `;
     })
@@ -1006,18 +1023,18 @@ function bindThemeButtons() {
   const lightButton = document.getElementById("light-theme-button");
   const darkButton = document.getElementById("dark-theme-button");
 
-  lightButton.addEventListener("click", () => {
+  bindPress(lightButton, async () => {
     applyTheme("light");
   });
 
-  darkButton.addEventListener("click", () => {
+  bindPress(darkButton, async () => {
     applyTheme("dark");
   });
 }
 
 function bindIdentityButtons() {
   document.querySelectorAll(".identity-button").forEach((button) => {
-    button.addEventListener("click", async () => {
+    bindPress(button, async () => {
       applyPerson(button.dataset.person);
       await renderApp();
     });
