@@ -3,9 +3,14 @@ const scheduleDays = 365;
 const people = ["Laura", "Dino"];
 const storageKey = "putzplan-all-tasks";
 const completionStorageKey = "putzplan-completions";
+const completionDetailsStorageKey = "putzplan-completion-details";
 const themeStorageKey = "putzplan-theme";
 const personStorageKey = "putzplan-person";
 const chatStorageKey = "putzplan-chat-messages";
+const chatReadStorageKey = "putzplan-chat-read";
+const musicEnabledStorageKey = "putzplan-music-enabled";
+const stickerSeenStorageKey = "putzplan-sticker-seen";
+const backgroundMusicSrc = "./time.mp3";
 const syncIntervalMs = 15000;
 const weatherRefreshMs = 15 * 60 * 1000;
 const defaultWeatherCoords = { latitude: 48.3069, longitude: 14.2858 };
@@ -50,6 +55,7 @@ const starterTasks = [
 let activeFilter = "all";
 let tasks = [];
 let completions = {};
+let completionDetails = {};
 let syncTimer = null;
 let weatherTimer = null;
 let editingTaskId = null;
@@ -61,7 +67,21 @@ let activeTheme = "light";
 let currentTodayIso = null;
 let currentPerson = "Laura";
 let chatMessages = [];
+let chatReadState = {};
+let stickerSeenState = {};
 let currentWeather = { temperature: null, variant: "clear", isDay: true };
+let musicEnabled = false;
+let backgroundMusic = null;
+const stickers = [
+  { id: "fruehstarter", title: "Frühstarter", src: "./stickers/cutouts/fruehstarter.png" },
+  { id: "alles-geschafft", title: "Alles geschafft", src: "./stickers/cutouts/alles-geschafft.png" },
+  { id: "wochenwunder", title: "Wochenwunder", src: "./stickers/cutouts/wochenwunder.png" },
+  { id: "staubjaeger", title: "Staubjäger", src: "./stickers/cutouts/staubjaeger.png" },
+  { id: "glanzkueche", title: "Glanzküche", src: "./stickers/cutouts/glanzkueche.png" },
+  { id: "badzauber", title: "Badzauber", src: "./stickers/cutouts/badzauber.png" },
+  { id: "wischprofi", title: "Wischprofi", src: "./stickers/cutouts/wischprofi.png" },
+  { id: "teamgeist", title: "Teamgeist", src: "./stickers/cutouts/teamgeist.png" },
+];
 
 function loadLocalTasks() {
   try {
@@ -79,6 +99,15 @@ function saveLocalTasks() {
 function loadLocalCompletions() {
   try {
     const raw = localStorage.getItem(completionStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadLocalCompletionDetails() {
+  try {
+    const raw = localStorage.getItem(completionDetailsStorageKey);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -110,6 +139,32 @@ function loadLocalChatMessages() {
   }
 }
 
+function loadLocalChatReadState() {
+  try {
+    const raw = localStorage.getItem(chatReadStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadLocalMusicEnabled() {
+  try {
+    return localStorage.getItem(musicEnabledStorageKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function loadLocalStickerSeenState() {
+  try {
+    const raw = localStorage.getItem(stickerSeenStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 function saveLocalTheme() {
   localStorage.setItem(themeStorageKey, activeTheme);
 }
@@ -122,8 +177,24 @@ function saveLocalChatMessages() {
   localStorage.setItem(chatStorageKey, JSON.stringify(chatMessages));
 }
 
+function saveLocalChatReadState() {
+  localStorage.setItem(chatReadStorageKey, JSON.stringify(chatReadState));
+}
+
 function saveLocalCompletions() {
   localStorage.setItem(completionStorageKey, JSON.stringify(completions));
+}
+
+function saveLocalCompletionDetails() {
+  localStorage.setItem(completionDetailsStorageKey, JSON.stringify(completionDetails));
+}
+
+function saveLocalMusicEnabled() {
+  localStorage.setItem(musicEnabledStorageKey, musicEnabled ? "true" : "false");
+}
+
+function saveLocalStickerSeenState() {
+  localStorage.setItem(stickerSeenStorageKey, JSON.stringify(stickerSeenState));
 }
 
 function cloneTask(task) {
@@ -216,6 +287,11 @@ function classifyWeatherVariant(code) {
   return "rain";
 }
 
+function getWeatherSceneKey() {
+  const variant = currentWeather.variant || "clear";
+  return `${variant}-${currentWeather.isDay === false ? "night" : "day"}`;
+}
+
 function renderHeroWeather() {
   const hero = document.querySelector(".hero");
 
@@ -223,9 +299,7 @@ function renderHeroWeather() {
     return;
   }
 
-  hero.classList.remove("weather-clear", "weather-cloudy", "weather-rain", "weather-fog", "weather-snow", "weather-storm");
-  hero.classList.add(`weather-${currentWeather.variant || "clear"}`);
-  hero.classList.toggle("weather-night", currentWeather.isDay === false);
+  hero.dataset.weatherScene = getWeatherSceneKey();
 }
 
 function getCurrentPositionOrFallback() {
@@ -332,6 +406,30 @@ async function loadCompletions() {
     completions[item.completion_key] = Boolean(item.done);
   });
   saveLocalCompletions();
+}
+
+function getCompletedEntries(schedule) {
+  const entries = [];
+
+  schedule.forEach((day) => {
+    ["Laura", "Dino"].forEach((person) => {
+      day[person].forEach((item) => {
+        if (!completions[item.key]) {
+          return;
+        }
+
+        entries.push({
+          key: item.key,
+          iso: day.iso,
+          person,
+          name: item.name,
+          completedAt: completionDetails[item.key]?.completedAt || null,
+        });
+      });
+    });
+  });
+
+  return entries;
 }
 
 async function loadChatMessages() {
@@ -606,9 +704,128 @@ function getTaskTypeTotals(days) {
   return Object.entries(totals).sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], "de"));
 }
 
+function isCompletedBeforeNoon(detail, iso) {
+  if (!detail?.completedAt) {
+    return false;
+  }
+
+  const completedAt = new Date(detail.completedAt);
+  if (Number.isNaN(completedAt.getTime())) {
+    return false;
+  }
+
+  return toIsoDate(completedAt) === iso && completedAt.getHours() < 12;
+}
+
+function getUnlockedStickerIds(schedule) {
+  const unlocked = new Set();
+  const todayIso = toIsoDate(new Date());
+  const relevantDays = schedule.filter((day) => day.iso >= todayIso);
+  const completedEntries = getCompletedEntries(relevantDays).filter((entry) => {
+    if (!entry.completedAt) {
+      return false;
+    }
+
+    return toIsoDate(new Date(entry.completedAt)) >= todayIso;
+  });
+
+  relevantDays.forEach((day) => {
+    const allItems = [...day.Laura, ...day.Dino];
+    if (allItems.length > 0 && allItems.every((item) => completions[item.key])) {
+      unlocked.add("alles-geschafft");
+    }
+
+    people.forEach((person) => {
+      const personItems = day[person];
+      if (
+        personItems.length > 0 &&
+        personItems.every((item) => completions[item.key] && isCompletedBeforeNoon(completionDetails[item.key], day.iso))
+      ) {
+        unlocked.add("fruehstarter");
+      }
+    });
+  });
+
+  for (let index = 0; index <= relevantDays.length - 7; index += 1) {
+    const weekSlice = relevantDays.slice(index, index + 7);
+    const completedWeek = weekSlice.every((day) => {
+      const allItems = [...day.Laura, ...day.Dino];
+      return allItems.length > 0 && allItems.every((item) => completions[item.key]);
+    });
+
+    if (completedWeek) {
+      unlocked.add("wochenwunder");
+      break;
+    }
+  }
+
+  if (completedEntries.filter((entry) => entry.name.startsWith("staubsaugen")).length >= 3) {
+    unlocked.add("staubjaeger");
+  }
+
+  if (completedEntries.filter((entry) => entry.name === "Küche putzen").length >= 3) {
+    unlocked.add("glanzkueche");
+  }
+
+  if (completedEntries.filter((entry) => entry.name === "Bad putzen").length >= 3) {
+    unlocked.add("badzauber");
+  }
+
+  if (completedEntries.filter((entry) => entry.name === "staubsaugen + Boden nass").length >= 2) {
+    unlocked.add("wischprofi");
+  }
+
+  const sharedDays = relevantDays.filter((day) => {
+    const lauraDone = day.Laura.some((item) => completions[item.key]);
+    const dinoDone = day.Dino.some((item) => completions[item.key]);
+    return lauraDone && dinoDone;
+  }).length;
+
+  if (sharedDays >= 3) {
+    unlocked.add("teamgeist");
+  }
+
+  return unlocked;
+}
+
+function getSeenStickerIds() {
+  return new Set(stickerSeenState[currentPerson] || []);
+}
+
+function getNewStickerCount(schedule) {
+  const unlocked = getUnlockedStickerIds(schedule);
+  const seen = getSeenStickerIds();
+  let count = 0;
+
+  unlocked.forEach((id) => {
+    if (!seen.has(id)) {
+      count += 1;
+    }
+  });
+
+  return count;
+}
+
+function renderStickerBadge(schedule) {
+  const badge = document.getElementById("sticker-unread-badge");
+  if (!badge) {
+    return;
+  }
+
+  const count = getNewStickerCount(schedule);
+  badge.textContent = count > 9 ? "9+" : String(count);
+  badge.classList.toggle("hidden", count === 0);
+}
+
+function markUnlockedStickersAsSeen(schedule) {
+  const unlocked = Array.from(getUnlockedStickerIds(schedule));
+  stickerSeenState[currentPerson] = unlocked;
+  saveLocalStickerSeenState();
+}
+
 function buildStats(schedule) {
   const taskTypeTotals = getTaskTypeTotals(schedule);
-  const skyClass = `weather-${currentWeather.variant || "clear"}${currentWeather.isDay === false ? " weather-night" : ""}`;
+  const skyClass = `weather-scene weather-scene-${getWeatherSceneKey()}`;
 
   return `
     <section class="stats-grid">
@@ -649,6 +866,7 @@ function renderChat() {
 
   if (!chatMessages.length) {
     container.innerHTML = '<p class="empty">Noch keine Nachrichten.</p>';
+    renderChatBadge();
     return;
   }
 
@@ -672,6 +890,132 @@ function renderChat() {
     .join("");
 
   container.scrollTop = container.scrollHeight;
+  markChatAsReadIfVisible();
+  renderChatBadge();
+}
+
+function getUnreadChatCount() {
+  const lastReadAt = chatReadState[currentPerson] || null;
+
+  return chatMessages.filter((message) => {
+    if (message.person === currentPerson) {
+      return false;
+    }
+
+    if (!lastReadAt) {
+      return true;
+    }
+
+    return new Date(message.createdAt) > new Date(lastReadAt);
+  }).length;
+}
+
+function renderChatBadge() {
+  const badge = document.getElementById("chat-unread-badge");
+  if (!badge) {
+    return;
+  }
+
+  const unreadCount = getUnreadChatCount();
+  badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+  badge.classList.toggle("hidden", unreadCount === 0);
+}
+
+function markChatAsRead() {
+  const latestIncoming = chatMessages
+    .filter((message) => message.person !== currentPerson)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+  if (!latestIncoming) {
+    return;
+  }
+
+  chatReadState[currentPerson] = latestIncoming.createdAt;
+  saveLocalChatReadState();
+}
+
+function markChatAsReadIfVisible() {
+  const panel = document.getElementById("chat-panel");
+  if (!panel || panel.classList.contains("hidden")) {
+    return;
+  }
+
+  if (getUnreadChatCount() === 0) {
+    return;
+  }
+
+  markChatAsRead();
+}
+
+function renderStickers(schedule) {
+  const container = document.getElementById("stickers-panel-content");
+  if (!container) {
+    return;
+  }
+
+  const unlockedStickerIds = getUnlockedStickerIds(schedule);
+  renderStickerBadge(schedule);
+
+  container.innerHTML = `
+    <section class="stickers-grid">
+      ${stickers
+        .map(
+          (sticker) => `
+            <button class="sticker-tile ${unlockedStickerIds.has(sticker.id) ? "" : "locked"}" type="button" data-sticker-id="${sticker.id}" ${unlockedStickerIds.has(sticker.id) ? "" : 'disabled aria-disabled="true"'}>
+              <img src="${sticker.src}" alt="${sticker.title}" />
+            </button>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+
+  container.querySelectorAll(".sticker-tile").forEach((button) => {
+    button.addEventListener("click", () => {
+      const sticker = stickers.find((item) => item.id === button.dataset.stickerId);
+      if (!sticker) {
+        return;
+      }
+
+      openStickerModal(sticker);
+      markUnlockedStickersAsSeen(schedule);
+      renderStickerBadge(schedule);
+    });
+  });
+}
+
+function openStickerModal(sticker, unlocked = false) {
+  const modal = document.getElementById("sticker-modal");
+  const image = document.getElementById("sticker-modal-image");
+  const title = document.getElementById("sticker-modal-title");
+  const card = document.querySelector(".sticker-modal-card");
+
+  if (!modal || !image || !title || !card) {
+    return;
+  }
+
+  image.src = sticker.src;
+  image.alt = sticker.title;
+  title.textContent = unlocked ? `${sticker.title} freigeschaltet!` : sticker.title;
+  card.classList.remove("unlock-pop");
+  if (unlocked) {
+    void card.offsetWidth;
+    card.classList.add("unlock-pop");
+  }
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeStickerModal() {
+  const modal = document.getElementById("sticker-modal");
+  const card = document.querySelector(".sticker-modal-card");
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+  card?.classList.remove("unlock-pop");
 }
 
 function describeRecurrence(task) {
@@ -823,6 +1167,11 @@ function renderTaskList(schedule) {
 
   document.querySelectorAll(".delete-task").forEach((button) => {
     button.addEventListener("click", async () => {
+      const confirmed = window.confirm("Willst du diese Aufgabe wirklich löschen?");
+      if (!confirmed) {
+        return;
+      }
+
       await deleteTask(button.dataset.taskId);
       if (editingTaskId === button.dataset.taskId) {
         resetTaskForm();
@@ -846,6 +1195,7 @@ function renderList(schedule) {
   bindTaskStatToggles();
   renderTaskList(schedule);
   renderChat();
+  renderStickers(schedule);
   renderDayPickerState(schedule);
 
   if (!dayListDays.length) {
@@ -993,6 +1343,7 @@ function renderToday(schedule) {
     button.addEventListener("click", async () => {
       const isDone = button.dataset.done === "true";
       const nextValue = !isDone;
+      const item = visibleItems.find((entry) => entry.key === button.dataset.completionKey);
 
       if (nextValue) {
         const confirmed = window.confirm("Ist diese Aufgabe wirklich erledigt?");
@@ -1001,10 +1352,151 @@ function renderToday(schedule) {
         }
       }
 
-      await setCompletion(button.dataset.completionKey, nextValue);
+      const unlockedBefore = getUnlockedStickerIds(schedule);
+      await setCompletion(button.dataset.completionKey, nextValue, item);
+      const unlockedAfter = getUnlockedStickerIds(schedule);
+      const newlyUnlocked = stickers.find((sticker) => !unlockedBefore.has(sticker.id) && unlockedAfter.has(sticker.id));
+
+      if (nextValue) {
+        if (newlyUnlocked) {
+          triggerStickerUnlock(newlyUnlocked, button);
+        } else {
+          triggerCompletionBurst(button);
+        }
+      }
       await renderApp();
     });
   });
+}
+
+function triggerCompletionBurst(originElement, withSound = true) {
+  const rect = originElement.getBoundingClientRect();
+  const burst = document.createElement("div");
+  burst.className = "completion-burst";
+  burst.style.left = `${rect.left + rect.width / 2}px`;
+  burst.style.top = `${rect.top + rect.height / 2}px`;
+
+  const colors = ["#ff8fb1", "#ffd166", "#a5e36e", "#8ec5ff", "#d6b3ff", "#ffb86b"];
+
+  for (let index = 0; index < 28; index += 1) {
+    const particle = document.createElement("span");
+    particle.className = "burst-particle";
+    particle.style.setProperty("--dx", `${Math.cos((Math.PI * 2 * index) / 28) * (58 + (index % 4) * 22)}px`);
+    particle.style.setProperty("--dy", `${Math.sin((Math.PI * 2 * index) / 28) * (58 + (index % 5) * 20)}px`);
+    particle.style.setProperty("--particle-color", colors[index % colors.length]);
+    particle.style.animationDelay = `${(index % 7) * 0.018}s`;
+    burst.appendChild(particle);
+  }
+
+  document.body.appendChild(burst);
+  if (withSound) {
+    playCompletionSound();
+  }
+  window.setTimeout(() => burst.remove(), 1000);
+}
+
+function triggerGrandFirework(originElement) {
+  const rect = originElement.getBoundingClientRect();
+  const burst = document.createElement("div");
+  burst.className = "completion-burst grand-burst";
+  burst.style.left = `${rect.left + rect.width / 2}px`;
+  burst.style.top = `${rect.top + rect.height / 2}px`;
+
+  const colors = ["#ff7eb6", "#ffd86b", "#8ec5ff", "#d6b3ff", "#ffb86b", "#fff0a8", "#9df2c3"];
+
+  for (let index = 0; index < 54; index += 1) {
+    const particle = document.createElement("span");
+    particle.className = "burst-particle";
+    particle.style.setProperty("--dx", `${Math.cos((Math.PI * 2 * index) / 54) * (96 + (index % 6) * 26)}px`);
+    particle.style.setProperty("--dy", `${Math.sin((Math.PI * 2 * index) / 54) * (96 + (index % 7) * 24)}px`);
+    particle.style.setProperty("--particle-color", colors[index % colors.length]);
+    particle.style.animationDelay = `${(index % 9) * 0.018}s`;
+    burst.appendChild(particle);
+  }
+
+  document.body.appendChild(burst);
+  window.setTimeout(() => burst.remove(), 1400);
+}
+
+function triggerStickerUnlock(sticker, originElement) {
+  triggerGrandFirework(originElement);
+  playStickerUnlockSound();
+  openStickerModal(sticker, true);
+}
+
+function playCompletionSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+
+  const audioContext = new AudioContextClass();
+  const notes = [
+    { frequency: 740, duration: 0.08, delay: 0 },
+    { frequency: 980, duration: 0.09, delay: 0.06 },
+    { frequency: 1240, duration: 0.12, delay: 0.12 },
+  ];
+
+  const now = audioContext.currentTime;
+
+  notes.forEach((note) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(note.frequency, now + note.delay);
+
+    gain.gain.setValueAtTime(0.0001, now + note.delay);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + note.delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + note.delay + note.duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(now + note.delay);
+    oscillator.stop(now + note.delay + note.duration);
+  });
+
+  window.setTimeout(() => {
+    audioContext.close().catch(() => {});
+  }, 450);
+}
+
+function playStickerUnlockSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+
+  const audioContext = new AudioContextClass();
+  const notes = [
+    { frequency: 659, duration: 0.12, delay: 0, type: "triangle", gain: 0.06 },
+    { frequency: 988, duration: 0.14, delay: 0.08, type: "triangle", gain: 0.08 },
+    { frequency: 1319, duration: 0.18, delay: 0.17, type: "sine", gain: 0.09 },
+    { frequency: 1760, duration: 0.24, delay: 0.29, type: "sine", gain: 0.11 },
+    { frequency: 2093, duration: 0.28, delay: 0.42, type: "sine", gain: 0.09 },
+  ];
+
+  const now = audioContext.currentTime;
+
+  notes.forEach((note) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = note.type;
+    oscillator.frequency.setValueAtTime(note.frequency, now + note.delay);
+    gain.gain.setValueAtTime(0.0001, now + note.delay);
+    gain.gain.exponentialRampToValueAtTime(note.gain, now + note.delay + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + note.delay + note.duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(now + note.delay);
+    oscillator.stop(now + note.delay + note.duration);
+  });
+
+  window.setTimeout(() => {
+    audioContext.close().catch(() => {});
+  }, 1100);
 }
 
 async function renderApp() {
@@ -1051,6 +1543,17 @@ function bindAccordions() {
       const isExpanded = button.getAttribute("aria-expanded") === "true";
       button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
       target.classList.toggle("hidden", isExpanded);
+
+      if (button.dataset.accordion === "chat-panel" && !isExpanded) {
+        markChatAsRead();
+        renderChatBadge();
+      }
+
+      if (button.dataset.accordion === "stickers-panel" && !isExpanded) {
+        const schedule = buildSchedule();
+        markUnlockedStickersAsSeen(schedule);
+        renderStickerBadge(schedule);
+      }
     });
   });
 }
@@ -1128,6 +1631,19 @@ function bindDayPicker() {
   });
 }
 
+function bindStickerModal() {
+  const backdrop = document.getElementById("sticker-modal-backdrop");
+  const image = document.getElementById("sticker-modal-image");
+
+  if (backdrop) {
+    backdrop.addEventListener("click", closeStickerModal);
+  }
+
+  if (image) {
+    image.addEventListener("click", closeStickerModal);
+  }
+}
+
 function bindThemeButtons() {
   const lightButton = document.getElementById("light-theme-button");
   const darkButton = document.getElementById("dark-theme-button");
@@ -1138,6 +1654,96 @@ function bindThemeButtons() {
 
   bindPress(darkButton, async () => {
     applyTheme("dark");
+  });
+}
+
+function updateMusicButton() {
+  const button = document.getElementById("music-button");
+  if (!button) {
+    return;
+  }
+
+  button.classList.toggle("music-active", musicEnabled);
+  button.setAttribute("aria-pressed", musicEnabled ? "true" : "false");
+}
+
+function ensureBackgroundMusic() {
+  if (backgroundMusic) {
+    return backgroundMusic;
+  }
+
+  const audio = new Audio(backgroundMusicSrc);
+  audio.loop = true;
+  audio.preload = "auto";
+  audio.volume = 0.22;
+  backgroundMusic = audio;
+  return backgroundMusic;
+}
+
+function stopBackgroundMusic() {
+  if (backgroundMusic) {
+    backgroundMusic.pause();
+    backgroundMusic.currentTime = 0;
+  }
+}
+
+async function startBackgroundMusic() {
+  const audio = ensureBackgroundMusic();
+  audio.currentTime = 0;
+  await audio.play();
+}
+
+function bindMusicButton() {
+  const button = document.getElementById("music-button");
+  if (!button) {
+    return;
+  }
+
+  updateMusicButton();
+
+  bindPress(button, async () => {
+    musicEnabled = !musicEnabled;
+    saveLocalMusicEnabled();
+    updateMusicButton();
+
+    if (musicEnabled) {
+      try {
+        await startBackgroundMusic();
+      } catch {
+        armMusicAutostart();
+      }
+    } else {
+      stopBackgroundMusic();
+    }
+  });
+}
+
+function armMusicAutostart() {
+  if (!musicEnabled || (backgroundMusic && !backgroundMusic.paused)) {
+    return;
+  }
+
+  const startOnGesture = async () => {
+    if (!musicEnabled || (backgroundMusic && !backgroundMusic.paused)) {
+      return;
+    }
+
+    try {
+      await startBackgroundMusic();
+    } catch {}
+  };
+
+  document.addEventListener("pointerdown", startOnGesture, { once: true });
+  document.addEventListener("keydown", startOnGesture, { once: true });
+}
+
+function tryStartBackgroundMusicImmediately() {
+  if (!musicEnabled || (backgroundMusic && !backgroundMusic.paused)) {
+    return;
+  }
+
+  startBackgroundMusic().catch(() => {
+    armMusicAutostart();
   });
 }
 
@@ -1301,11 +1907,22 @@ async function deleteTask(taskId) {
   await loadTasks();
 }
 
-async function setCompletion(completionKey, done) {
+async function setCompletion(completionKey, done, item) {
   completions[completionKey] = done;
+  if (done) {
+    completionDetails[completionKey] = {
+      completedAt: new Date().toISOString(),
+      person: item?.person || null,
+      name: item?.name || null,
+      iso: currentTodayIso || null,
+    };
+  } else {
+    delete completionDetails[completionKey];
+  }
 
   if (!supabaseClient) {
     saveLocalCompletions();
+    saveLocalCompletionDetails();
     return;
   }
 
@@ -1320,10 +1937,12 @@ async function setCompletion(completionKey, done) {
 
   if (error) {
     saveLocalCompletions();
+    saveLocalCompletionDetails();
     return;
   }
 
   saveLocalCompletions();
+  saveLocalCompletionDetails();
 }
 
 function startEditingTask(taskId) {
@@ -1465,6 +2084,11 @@ function startWeatherRefresh() {
 async function initApp() {
   applyTheme(loadLocalTheme());
   currentPerson = loadLocalPerson();
+  completionDetails = loadLocalCompletionDetails();
+  chatReadState = loadLocalChatReadState();
+  stickerSeenState = loadLocalStickerSeenState();
+  musicEnabled = false;
+  saveLocalMusicEnabled();
   await loadWeather();
   await loadTasks();
   await loadCompletions();
@@ -1475,10 +2099,14 @@ async function initApp() {
   bindTodayNavigation();
   bindDayPicker();
   bindThemeButtons();
+  bindMusicButton();
   bindIdentityButtons();
   bindChatForm();
   bindTaskForm();
+  bindStickerModal();
   applyPerson(currentPerson);
+  updateMusicButton();
+  tryStartBackgroundMusicImmediately();
   await renderApp();
   await startPolling();
   startWeatherRefresh();

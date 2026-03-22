@@ -29,6 +29,11 @@
             </div>
           </div>
           <div class="hero-tools">
+            <button class="music-button" id="music-button" type="button" aria-label="Hintergrundmusik" title="Hintergrundmusik">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6v11.2a2.8 2.8 0 1 1-1.5-2.5V8.1l8-1.8v8.9a2.8 2.8 0 1 1-1.5-2.5V4.5L10 6Z"></path>
+              </svg>
+            </button>
             <div class="theme-switcher" aria-label="Design wählen">
               <button class="theme-button active-theme" id="light-theme-button" type="button" aria-label="Helles Design" title="Helles Design">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -131,7 +136,7 @@
 
       <section class="dropdown-section">
         <button class="dropdown-summary" type="button" data-accordion="chat-panel" aria-expanded="false">
-          <p class="label">Chat</p>
+          <p class="label">Chat <span class="chat-unread-badge hidden" id="chat-unread-badge">0</span></p>
         </button>
         <section class="accordion-content hidden" id="chat-panel">
           <section class="chat-panel">
@@ -152,7 +157,24 @@
           <section class="stats" id="stats"></section>
         </section>
       </section>
+
+      <section class="dropdown-section">
+        <button class="dropdown-summary" type="button" data-accordion="stickers-panel" aria-expanded="false">
+          <p class="label">Sticker <span class="chat-unread-badge hidden" id="sticker-unread-badge">0</span></p>
+        </button>
+        <section class="accordion-content hidden" id="stickers-panel">
+          <section class="stickers-panel" id="stickers-panel-content"></section>
+        </section>
+      </section>
     </main>
+
+    <section class="sticker-modal hidden" id="sticker-modal" aria-hidden="true">
+      <button class="sticker-modal-backdrop" id="sticker-modal-backdrop" type="button" aria-label="Sticker schließen"></button>
+      <article class="sticker-modal-card">
+        <img class="sticker-modal-image" id="sticker-modal-image" alt="" />
+        <p class="sticker-modal-title" id="sticker-modal-title"></p>
+      </article>
+    </section>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
