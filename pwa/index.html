@@ -176,6 +176,19 @@
       </article>
     </section>
 
+    <section class="task-action-modal hidden" id="task-action-modal" aria-hidden="true">
+      <button class="task-action-backdrop" data-task-action-cancel type="button" aria-label="Aktion schließen"></button>
+      <article class="task-action-card">
+        <p class="task-action-title" id="task-action-title"></p>
+        <div class="task-action-buttons">
+          <button class="primary-button" id="task-action-complete" type="button">abhaken</button>
+          <button class="ghost-button" id="task-action-postpone" type="button">1 Tag verschieben</button>
+          <button class="ghost-button hidden" id="task-action-restore" type="button">1 Tag zurück</button>
+          <button class="ghost-button" data-task-action-cancel type="button">abbrechen</button>
+        </div>
+      </article>
+    </section>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="./app.js"></script>

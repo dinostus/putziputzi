@@ -4,6 +4,7 @@ const people = ["Laura", "Dino"];
 const storageKey = "putzplan-all-tasks";
 const completionStorageKey = "putzplan-completions";
 const completionDetailsStorageKey = "putzplan-completion-details";
+const postponementStorageKey = "putzplan-postponements";
 const themeStorageKey = "putzplan-theme";
 const personStorageKey = "putzplan-person";
 const chatStorageKey = "putzplan-chat-messages";
@@ -14,6 +15,8 @@ const backgroundMusicSrc = "./time.mp3";
 const syncIntervalMs = 15000;
 const weatherRefreshMs = 15 * 60 * 1000;
 const defaultWeatherCoords = { latitude: 48.3069, longitude: 14.2858 };
+const cleanupAnchorIso = "2026-03-27";
+const cleanupAnchorPerson = "Dino";
 const monthFormatter = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
   day: "numeric",
@@ -56,6 +59,7 @@ let activeFilter = "all";
 let tasks = [];
 let completions = {};
 let completionDetails = {};
+let postponements = {};
 let syncTimer = null;
 let weatherTimer = null;
 let editingTaskId = null;
@@ -72,15 +76,17 @@ let stickerSeenState = {};
 let currentWeather = { temperature: null, variant: "clear", isDay: true };
 let musicEnabled = false;
 let backgroundMusic = null;
+let pendingKassaAnimation = null;
 const stickers = [
-  { id: "fruehstarter", title: "Frühstarter", src: "./stickers/cutouts/fruehstarter.png" },
-  { id: "alles-geschafft", title: "Alles geschafft", src: "./stickers/cutouts/alles-geschafft.png" },
-  { id: "wochenwunder", title: "Wochenwunder", src: "./stickers/cutouts/wochenwunder.png" },
-  { id: "staubjaeger", title: "Staubjäger", src: "./stickers/cutouts/staubjaeger.png" },
-  { id: "glanzkueche", title: "Glanzküche", src: "./stickers/cutouts/glanzkueche.png" },
-  { id: "badzauber", title: "Badzauber", src: "./stickers/cutouts/badzauber.png" },
-  { id: "wischprofi", title: "Wischprofi", src: "./stickers/cutouts/wischprofi.png" },
-  { id: "teamgeist", title: "Teamgeist", src: "./stickers/cutouts/teamgeist.png" },
+  { id: "fruehstarter", title: "Frühstarter", src: "./stickers/NEW_STICKERS_CUTOUTS/Frühstarter.png" },
+  { id: "abendfleiss", title: "Abendfleiß", src: "./stickers/NEW_STICKERS_CUTOUTS/abendfleiß.png" },
+  { id: "alles-geschafft", title: "Alles geschafft", src: "./stickers/NEW_STICKERS_CUTOUTS/alles geschafft.png" },
+  { id: "wochenwunder", title: "Wochenwunder", src: "./stickers/NEW_STICKERS_CUTOUTS/Wochenwunder.png" },
+  { id: "staubjaeger", title: "Staubjäger", src: "./stickers/NEW_STICKERS_CUTOUTS/staubjäger.png" },
+  { id: "glanzkueche", title: "Glanzküche", src: "./stickers/NEW_STICKERS_CUTOUTS/glanzküche.png" },
+  { id: "badzauber", title: "Badzauber", src: "./stickers/NEW_STICKERS_CUTOUTS/badzauber.png" },
+  { id: "wischprofi", title: "Wischprofi", src: "./stickers/NEW_STICKERS_CUTOUTS/wischprofi.png" },
+  { id: "teamgeist", title: "Teamgeist", src: "./stickers/NEW_STICKERS_CUTOUTS/teamgeist.png" },
 ];
 
 function loadLocalTasks() {
@@ -108,6 +114,15 @@ function loadLocalCompletions() {
 function loadLocalCompletionDetails() {
   try {
     const raw = localStorage.getItem(completionDetailsStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadLocalPostponements() {
+  try {
+    const raw = localStorage.getItem(postponementStorageKey);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -187,6 +202,10 @@ function saveLocalCompletions() {
 
 function saveLocalCompletionDetails() {
   localStorage.setItem(completionDetailsStorageKey, JSON.stringify(completionDetails));
+}
+
+function saveLocalPostponements() {
+  localStorage.setItem(postponementStorageKey, JSON.stringify(postponements));
 }
 
 function saveLocalMusicEnabled() {
@@ -536,6 +555,95 @@ function isLegacyFloorMopTask(task) {
   return task.seedKey === "seed-7" || task.name === "staubsaugen + Boden nass";
 }
 
+function isEveningCleanupTask(task) {
+  return (
+    task.seedKey === "seed-1" ||
+    task.name === "aufräumen" ||
+    task.name === "aufräumen ab 18 Uhr"
+  );
+}
+
+function getEveningCleanupDisplayName() {
+  return "aufräumen ab 18 Uhr";
+}
+
+function getCleanupWindowPerson(task, windowStartIso) {
+  const anchorDate = fromIsoDate(cleanupAnchorIso);
+  const windowStart = fromIsoDate(windowStartIso);
+  const diffDays = toDayNumber(windowStart) - toDayNumber(anchorDate);
+
+  return Math.abs(diffDays) % 2 === 0
+    ? cleanupAnchorPerson
+    : oppositePerson(cleanupAnchorPerson);
+}
+
+function getCurrentCleanupAssignment(task, dayIso) {
+  const windowStartIso = dayIso;
+  const person = getCleanupWindowPerson(task, windowStartIso);
+  return {
+    taskId: task.id,
+    name: getEveningCleanupDisplayName(),
+    key: `${windowStartIso}|${person}|${task.id}|cleanup`,
+    person,
+    windowStartIso,
+  };
+}
+
+function isPostponableItem(item) {
+  if (!item) {
+    return false;
+  }
+
+  if (item.name === getEveningCleanupDisplayName()) {
+    return false;
+  }
+
+  if (item.name === "Müll rausbringen") {
+    return false;
+  }
+
+  return true;
+}
+
+function addOneDay(iso) {
+  const date = fromIsoDate(iso);
+  date.setDate(date.getDate() + 1);
+  return toIsoDate(date);
+}
+
+function applyPostponements(days) {
+  Object.entries(postponements).forEach(([itemKey, targetIso]) => {
+    if (!targetIso) {
+      return;
+    }
+
+    let movedItem = null;
+    let sourcePerson = null;
+
+    days.forEach((day) => {
+      ["Laura", "Dino"].forEach((person) => {
+        const itemIndex = day[person].findIndex((entry) => entry.key === itemKey);
+        if (itemIndex >= 0) {
+          movedItem = day[person][itemIndex];
+          sourcePerson = person;
+          day[person].splice(itemIndex, 1);
+        }
+      });
+    });
+
+    if (!movedItem || !sourcePerson) {
+      return;
+    }
+
+    const targetDay = days.find((day) => day.iso === targetIso);
+    if (!targetDay) {
+      return;
+    }
+
+    targetDay[sourcePerson].push(movedItem);
+  });
+}
+
 function choosePersonForTask(task, day, taskCounts, overallCounts, occurrence) {
   const perTaskCounts = taskCounts[task.id] || { Laura: 0, Dino: 0 };
   const dayCounts = {
@@ -588,11 +696,34 @@ function buildSchedule() {
     counts[task.id] = { Laura: 0, Dino: 0 };
   });
 
+  let cleanupOccurrence = 0;
+
   tasks
     .slice()
     .filter((task) => !isLegacyFloorMopTask(task))
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name, "de"))
     .forEach((task) => {
+      if (isEveningCleanupTask(task)) {
+        days.forEach((day) => {
+          if (!matchesRecurrence(task, day)) {
+            return;
+          }
+
+          const basePerson = task.firstPerson || "Laura";
+          const person = cleanupOccurrence % 2 === 0 ? basePerson : oppositePerson(basePerson);
+          const item = {
+            taskId: task.id,
+            name: getEveningCleanupDisplayName(),
+            key: `${day.iso}|${person}|${task.id}|cleanup|${cleanupOccurrence}`,
+          };
+          day[person].push(item);
+          counts[task.id][person] += 1;
+          overallCounts[person] += 1;
+          cleanupOccurrence += 1;
+        });
+        return;
+      }
+
       days.forEach((day) => {
         if (!matchesRecurrence(task, day)) {
           return;
@@ -616,6 +747,8 @@ function buildSchedule() {
         overallCounts[person] += 1;
       });
     });
+
+  applyPostponements(days);
 
   return days;
 }
@@ -717,6 +850,19 @@ function isCompletedBeforeNoon(detail, iso) {
   return toIsoDate(completedAt) === iso && completedAt.getHours() < 12;
 }
 
+function isCompletedAfterEvening(detail, iso) {
+  if (!detail?.completedAt) {
+    return false;
+  }
+
+  const completedAt = new Date(detail.completedAt);
+  if (Number.isNaN(completedAt.getTime())) {
+    return false;
+  }
+
+  return toIsoDate(completedAt) === iso && completedAt.getHours() >= 18;
+}
+
 function getUnlockedStickerIds(schedule) {
   const unlocked = new Set();
   const todayIso = toIsoDate(new Date());
@@ -730,7 +876,7 @@ function getUnlockedStickerIds(schedule) {
   });
 
   relevantDays.forEach((day) => {
-    const allItems = [...day.Laura, ...day.Dino];
+    const allItems = [...day.Laura, ...day.Dino].filter((item) => item.name !== getEveningCleanupDisplayName());
     if (allItems.length > 0 && allItems.every((item) => completions[item.key])) {
       unlocked.add("alles-geschafft");
     }
@@ -739,9 +885,16 @@ function getUnlockedStickerIds(schedule) {
       const personItems = day[person];
       if (
         personItems.length > 0 &&
-        personItems.every((item) => completions[item.key] && isCompletedBeforeNoon(completionDetails[item.key], day.iso))
+        personItems.some((item) => item.name !== getEveningCleanupDisplayName() && completions[item.key] && isCompletedBeforeNoon(completionDetails[item.key], day.iso))
       ) {
         unlocked.add("fruehstarter");
+      }
+
+      if (
+        personItems.length > 0 &&
+        personItems.some((item) => item.name !== getEveningCleanupDisplayName() && completions[item.key] && isCompletedAfterEvening(completionDetails[item.key], day.iso))
+      ) {
+        unlocked.add("abendfleiss");
       }
     });
   });
@@ -749,7 +902,7 @@ function getUnlockedStickerIds(schedule) {
   for (let index = 0; index <= relevantDays.length - 7; index += 1) {
     const weekSlice = relevantDays.slice(index, index + 7);
     const completedWeek = weekSlice.every((day) => {
-      const allItems = [...day.Laura, ...day.Dino];
+      const allItems = [...day.Laura, ...day.Dino].filter((item) => item.name !== getEveningCleanupDisplayName());
       return allItems.length > 0 && allItems.every((item) => completions[item.key]);
     });
 
@@ -776,8 +929,8 @@ function getUnlockedStickerIds(schedule) {
   }
 
   const sharedDays = relevantDays.filter((day) => {
-    const lauraDone = day.Laura.some((item) => completions[item.key]);
-    const dinoDone = day.Dino.some((item) => completions[item.key]);
+    const lauraDone = day.Laura.some((item) => item.name !== getEveningCleanupDisplayName() && completions[item.key]);
+    const dinoDone = day.Dino.some((item) => item.name !== getEveningCleanupDisplayName() && completions[item.key]);
     return lauraDone && dinoDone;
   }).length;
 
@@ -823,13 +976,61 @@ function markUnlockedStickersAsSeen(schedule) {
   saveLocalStickerSeenState();
 }
 
+function buildPostponementLookup(schedule) {
+  const lookup = new Map();
+  schedule.forEach((day) => {
+    day.Laura.forEach((item) => {
+      lookup.set(item.key, { ...item, person: "Laura" });
+    });
+    day.Dino.forEach((item) => {
+      lookup.set(item.key, { ...item, person: "Dino" });
+    });
+  });
+  return lookup;
+}
+
+function getKassaTotals(schedule) {
+  const lookup = buildPostponementLookup(schedule);
+  const totals = { Laura: 0, Dino: 0, total: 0, count: 0 };
+
+  Object.keys(postponements).forEach((itemKey) => {
+    const item = lookup.get(itemKey);
+    if (!item || !people.includes(item.person)) {
+      return;
+    }
+
+    totals[item.person] += 2;
+    totals.total += 2;
+    totals.count += 1;
+  });
+
+  return totals;
+}
+
+function animateKassaDeposit() {}
+
+function animateKassaRestore() {}
+
 function buildStats(schedule) {
   const taskTypeTotals = getTaskTypeTotals(schedule);
   const skyClass = `weather-scene weather-scene-${getWeatherSceneKey()}`;
+  const kassa = getKassaTotals(schedule);
 
   return `
     <section class="stats-grid">
-      <article class="stat-box stat-box-wide stats-sky-card ${skyClass}" aria-hidden="true"></article>
+      <article class="stat-box kassa-card stats-sky-card ${skyClass}" id="kassa-card">
+        <div class="kassa-head">
+          <span class="label">Kassa</span>
+          <strong>${kassa.total.toFixed(2).replace(".", ",")} €</strong>
+        </div>
+        <div class="piggy-stage" aria-hidden="true">
+          <img class="piggy-bank-image" src="./Kawaii rosa Sparschwein mit Sternen.png" alt="Sparschwein" />
+        </div>
+        <div class="kassa-meta">
+          <p><span class="kassa-dot laura-dot"></span>Laura: ${kassa.Laura.toFixed(2).replace(".", ",")} €</p>
+          <p><span class="kassa-dot dino-dot"></span>Dino: ${kassa.Dino.toFixed(2).replace(".", ",")} €</p>
+        </div>
+      </article>
     </section>
     <section class="stats-task-types">
       <div class="stats-section-head">
@@ -1018,7 +1219,54 @@ function closeStickerModal() {
   card?.classList.remove("unlock-pop");
 }
 
+function openTaskActionModal(item) {
+  const modal = document.getElementById("task-action-modal");
+  const title = document.getElementById("task-action-title");
+  const postponeButton = document.getElementById("task-action-postpone");
+  const restoreButton = document.getElementById("task-action-restore");
+  const completeButton = document.getElementById("task-action-complete");
+  const cancelButtons = document.querySelectorAll("[data-task-action-cancel]");
+
+  if (!modal || !title || !postponeButton || !restoreButton || !completeButton) {
+    return Promise.resolve("cancel");
+  }
+
+  title.textContent = `${item.person}: ${item.name}`;
+  const canPostpone = isPostponableItem(item);
+  const canRestore = Boolean(postponements[item.key]);
+  postponeButton.classList.toggle("hidden", !canPostpone);
+  restoreButton.classList.toggle("hidden", !canRestore);
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+
+  return new Promise((resolve) => {
+    const cleanup = (result) => {
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      completeButton.removeEventListener("click", onComplete);
+      postponeButton.removeEventListener("click", onPostpone);
+      restoreButton.removeEventListener("click", onRestore);
+      cancelButtons.forEach((button) => button.removeEventListener("click", onCancel));
+      resolve(result);
+    };
+
+    const onComplete = () => cleanup("complete");
+    const onPostpone = () => cleanup("postpone");
+    const onRestore = () => cleanup("restore");
+    const onCancel = () => cleanup("cancel");
+
+    completeButton.addEventListener("click", onComplete);
+    postponeButton.addEventListener("click", onPostpone);
+    restoreButton.addEventListener("click", onRestore);
+    cancelButtons.forEach((button) => button.addEventListener("click", onCancel));
+  });
+}
+
 function describeRecurrence(task) {
+  if (isEveningCleanupTask(task)) {
+    return `Ab ${task.startDate} | täglich | Wechsel ab 18 Uhr | Start: ${task.firstPerson}`;
+  }
+
   const units = {
     days: task.interval === 1 ? "jeden Tag" : `alle ${task.interval} Tage`,
     weeks: task.interval === 1 ? "jede Woche" : `alle ${task.interval} Wochen`,
@@ -1029,6 +1277,10 @@ function describeRecurrence(task) {
 }
 
 function getTaskDisplayName(task) {
+  if (isEveningCleanupTask(task)) {
+    return getEveningCleanupDisplayName();
+  }
+
   if (task.seedKey === "seed-2") {
     return "staubsaugen (alle vier Wochen + nass)";
   }
@@ -1192,6 +1444,13 @@ function renderList(schedule) {
   const dayListDays = getDayListDays(schedule);
 
   stats.innerHTML = buildStats(schedule);
+  if (pendingKassaAnimation === "restore") {
+    animateKassaRestore();
+    pendingKassaAnimation = null;
+  } else if (pendingKassaAnimation) {
+    animateKassaDeposit(pendingKassaAnimation);
+    pendingKassaAnimation = null;
+  }
   bindTaskStatToggles();
   renderTaskList(schedule);
   renderChat();
@@ -1346,8 +1605,29 @@ function renderToday(schedule) {
       const item = visibleItems.find((entry) => entry.key === button.dataset.completionKey);
 
       if (nextValue) {
-        const confirmed = window.confirm("Ist diese Aufgabe wirklich erledigt?");
-        if (!confirmed) {
+        const action = isPostponableItem(item)
+          ? await openTaskActionModal(item)
+          : (window.confirm("Ist diese Aufgabe wirklich erledigt?") ? "complete" : "cancel");
+
+        if (action === "cancel") {
+          return;
+        }
+
+        if (action === "postpone") {
+          postponements[item.key] = addOneDay(today.iso);
+          saveLocalPostponements();
+          pendingKassaAnimation = item.person;
+          playPiggyBankSound();
+          await renderApp();
+          return;
+        }
+
+        if (action === "restore") {
+          delete postponements[item.key];
+          saveLocalPostponements();
+          pendingKassaAnimation = "restore";
+          playPiggyBankRestoreSound();
+          await renderApp();
           return;
         }
       }
@@ -1461,6 +1741,79 @@ function playCompletionSound() {
   }, 450);
 }
 
+function playPiggyBankSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+
+  const audioContext = new AudioContextClass();
+  const notes = [
+    { frequency: 1120, duration: 0.045, delay: 0, type: "triangle", volume: 0.08 },
+    { frequency: 860, duration: 0.09, delay: 0.055, type: "sine", volume: 0.06 },
+    { frequency: 520, duration: 0.16, delay: 0.11, type: "triangle", volume: 0.05 },
+  ];
+
+  const now = audioContext.currentTime;
+
+  notes.forEach((note) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = note.type;
+    oscillator.frequency.setValueAtTime(note.frequency, now + note.delay);
+
+    gain.gain.setValueAtTime(0.0001, now + note.delay);
+    gain.gain.exponentialRampToValueAtTime(note.volume, now + note.delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + note.delay + note.duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(now + note.delay);
+    oscillator.stop(now + note.delay + note.duration);
+  });
+
+  window.setTimeout(() => {
+    audioContext.close().catch(() => {});
+  }, 420);
+}
+
+function playPiggyBankRestoreSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+
+  const audioContext = new AudioContextClass();
+  const notes = [
+    { frequency: 520, duration: 0.08, delay: 0, type: "triangle", volume: 0.045 },
+    { frequency: 420, duration: 0.12, delay: 0.07, type: "sine", volume: 0.03 },
+  ];
+
+  const now = audioContext.currentTime;
+
+  notes.forEach((note) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = note.type;
+    oscillator.frequency.setValueAtTime(note.frequency, now + note.delay);
+
+    gain.gain.setValueAtTime(0.0001, now + note.delay);
+    gain.gain.exponentialRampToValueAtTime(note.volume, now + note.delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + note.delay + note.duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(now + note.delay);
+    oscillator.stop(now + note.delay + note.duration);
+  });
+
+  window.setTimeout(() => {
+    audioContext.close().catch(() => {});
+  }, 300);
+}
+
 function playStickerUnlockSound() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) {
@@ -1507,14 +1860,33 @@ async function renderApp() {
 }
 
 function getTodayVisibleItems(today) {
-  const items = [];
+  const lauraItems = [];
+  const dinoItems = [];
+  const cleanupTask = tasks.find((task) => isEveningCleanupTask(task));
+
   if (activeFilter === "all" || activeFilter === "Laura") {
-    today.Laura.forEach((item) => items.push({ ...item, person: "Laura" }));
+    today.Laura
+      .filter((item) => !cleanupTask || item.taskId !== cleanupTask.id)
+      .forEach((item) => lauraItems.push({ ...item, person: "Laura" }));
   }
   if (activeFilter === "all" || activeFilter === "Dino") {
-    today.Dino.forEach((item) => items.push({ ...item, person: "Dino" }));
+    today.Dino
+      .filter((item) => !cleanupTask || item.taskId !== cleanupTask.id)
+      .forEach((item) => dinoItems.push({ ...item, person: "Dino" }));
   }
-  return items;
+
+  if (cleanupTask) {
+    const currentCleanup = getCurrentCleanupAssignment(cleanupTask, today.iso);
+    if (currentCleanup.person === "Laura") {
+      if (activeFilter === "all" || activeFilter === "Laura") {
+        lauraItems.unshift(currentCleanup);
+      }
+    } else if (activeFilter === "all" || activeFilter === "Dino") {
+      dinoItems.unshift(currentCleanup);
+    }
+  }
+
+  return [...lauraItems, ...dinoItems];
 }
 
 function bindFilters() {
@@ -2085,6 +2457,7 @@ async function initApp() {
   applyTheme(loadLocalTheme());
   currentPerson = loadLocalPerson();
   completionDetails = loadLocalCompletionDetails();
+  postponements = loadLocalPostponements();
   chatReadState = loadLocalChatReadState();
   stickerSeenState = loadLocalStickerSeenState();
   musicEnabled = false;

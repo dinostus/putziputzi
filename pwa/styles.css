@@ -524,8 +524,108 @@ h1 {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+}
+
+.kassa-card {
+  position: relative;
+  overflow: hidden;
+  padding: 14px 14px 12px;
+  min-height: 248px;
+}
+
+.kassa-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body[data-theme="dark"] .kassa-card::before {
+  background: transparent;
+}
+
+.kassa-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kassa-head strong {
+  font-size: 1rem;
+  color: var(--accent-strong);
+}
+
+.piggy-stage {
+  position: relative;
+  min-height: 116px;
+  margin-top: 10px;
+}
+
+.piggy-bank-image {
+  display: block;
+  width: min(200px, 100%);
+  height: auto;
+  margin: 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(63, 34, 46, 0.22));
+}
+
+.kassa-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+  color: rgba(255, 247, 251, 0.92);
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 1;
+}
+
+.kassa-meta p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kassa-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.laura-dot {
+  background: #f1a6c4;
+}
+
+.dino-dot {
+  background: #8cb6ff;
+}
+
+.kassa-head,
+.piggy-stage {
+  position: relative;
+  z-index: 1;
+}
+
+.kassa-card .label,
+.kassa-card strong {
+  color: #ffffff;
+  text-shadow:
+    0 1px 2px rgba(44, 22, 33, 0.9),
+    0 3px 10px rgba(44, 22, 33, 0.6);
+}
+
+.kassa-meta p {
+  color: #fffafc;
+  text-shadow:
+    0 1px 2px rgba(44, 22, 33, 0.88),
+    0 2px 8px rgba(44, 22, 33, 0.5);
 }
 
 .stat-box-wide strong {
@@ -1187,6 +1287,7 @@ body[data-theme="dark"] .task-calendar-day.dino-mark {
   }
 }
 
+
 .sticker-modal {
   position: fixed;
   inset: 0;
@@ -1235,6 +1336,46 @@ body[data-theme="dark"] .task-calendar-day.dino-mark {
   font-weight: 800;
   color: var(--accent-strong);
   text-shadow: 0 2px 14px rgba(16, 10, 14, 0.18);
+}
+
+.task-action-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+}
+
+.task-action-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(18, 10, 17, 0.56);
+}
+
+.task-action-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 420px);
+  padding: 20px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 14px;
+}
+
+.task-action-title {
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+  color: var(--accent-strong);
+}
+
+.task-action-buttons {
+  display: grid;
+  gap: 10px;
 }
 
 @keyframes sticker-unlock-pop {
