@@ -1443,18 +1443,27 @@ function renderList(schedule) {
   const visibleDays = getVisibleDays(schedule);
   const dayListDays = getDayListDays(schedule);
 
-  stats.innerHTML = buildStats(schedule);
-  if (pendingKassaAnimation === "restore") {
-    animateKassaRestore();
-    pendingKassaAnimation = null;
-  } else if (pendingKassaAnimation) {
-    animateKassaDeposit(pendingKassaAnimation);
-    pendingKassaAnimation = null;
+  const statsPanel = document.getElementById("stats-panel");
+  if (statsPanel && !statsPanel.classList.contains("hidden")) {
+    stats.innerHTML = buildStats(schedule);
+    if (pendingKassaAnimation === "restore") {
+      animateKassaRestore();
+      pendingKassaAnimation = null;
+    } else if (pendingKassaAnimation) {
+      animateKassaDeposit(pendingKassaAnimation);
+      pendingKassaAnimation = null;
+    }
+    bindTaskStatToggles();
   }
-  bindTaskStatToggles();
+
   renderTaskList(schedule);
   renderChat();
-  renderStickers(schedule);
+  const stickersPanel = document.getElementById("stickers-panel");
+  if (stickersPanel && !stickersPanel.classList.contains("hidden")) {
+    renderStickers(schedule);
+  } else {
+    renderStickerBadge(schedule);
+  }
   renderDayPickerState(schedule);
 
   if (!dayListDays.length) {
@@ -1921,8 +1930,18 @@ function bindAccordions() {
         renderChatBadge();
       }
 
+      if (button.dataset.accordion === "stats-panel" && !isExpanded) {
+        const schedule = buildSchedule();
+        const stats = document.getElementById("stats");
+        if (stats) {
+          stats.innerHTML = buildStats(schedule);
+          bindTaskStatToggles();
+        }
+      }
+
       if (button.dataset.accordion === "stickers-panel" && !isExpanded) {
         const schedule = buildSchedule();
+        renderStickers(schedule);
         markUnlockedStickersAsSeen(schedule);
         renderStickerBadge(schedule);
       }
@@ -2462,10 +2481,12 @@ async function initApp() {
   stickerSeenState = loadLocalStickerSeenState();
   musicEnabled = false;
   saveLocalMusicEnabled();
-  await loadWeather();
-  await loadTasks();
-  await loadCompletions();
-  await loadChatMessages();
+  tasks = loadLocalTasks();
+  completions = loadLocalCompletions();
+  chatMessages = loadLocalChatMessages();
+  loadWeather()
+    .then(renderHeroWeather)
+    .catch(() => {});
   currentTodayIso = toIsoDate(new Date());
   bindFilters();
   bindAccordions();
@@ -2481,6 +2502,11 @@ async function initApp() {
   updateMusicButton();
   tryStartBackgroundMusicImmediately();
   await renderApp();
+  if (supabaseClient) {
+    Promise.all([loadTasks(), loadCompletions(), loadChatMessages()])
+      .then(renderApp)
+      .catch(() => {});
+  }
   await startPolling();
   startWeatherRefresh();
 
